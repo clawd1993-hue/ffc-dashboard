@@ -1,12 +1,34 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0d0d0d">
+<meta name="theme-color" content="#f4f4f1" id="themeColor">
 <title>FFC Dashboard</title>
 <style>
-  :root {
+  :root { /* LIGHT (default) */
+    color-scheme: light;
+    --page:        #f4f4f1;
+    --surface:     #ffffff;
+    --surface-2:   #efeeea;
+    --text:        #0b0b0b;
+    --text-2:      #52514e;
+    --muted:       #8a8884;
+    --hair:        rgba(11,11,11,0.10);
+    --bar:         rgba(244,244,241,0.90);
+    --blue:        #2a78d6;
+    --good:        #0ca30c;
+    --warning:     #fab219;
+    --serious:     #ec835a;
+    --critical:    #d03b3b;
+    /* ordinal blue ramp (light) for funnel stages */
+    --o1: #6da7ec; --o2: #3987e5; --o3: #256abf; --o4: #184f95; --o5: #104281;
+    /* badge foregrounds (readable on light) */
+    --bf-blue: #1c5cab; --bf-green: #0a7a0a; --bf-amber: #8a5b00; --bf-red: #b02a2a;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+  html[data-theme="dark"] {
     color-scheme: dark;
     --page:        #0d0d0d;
     --surface:     #1a1a19;
@@ -15,15 +37,10 @@
     --text-2:      #c3c2b7;
     --muted:       #898781;
     --hair:        rgba(255,255,255,0.10);
+    --bar:         rgba(13,13,13,0.92);
     --blue:        #3987e5;
-    --good:        #0ca30c;
-    --warning:     #fab219;
-    --serious:     #ec835a;
-    --critical:    #d03b3b;
-    /* ordinal blue ramp (dark) for funnel stages */
     --o1: #86b6ef; --o2: #5598e7; --o3: #3987e5; --o4: #256abf; --o5: #184f95;
-    --safe-top: env(safe-area-inset-top, 0px);
-    --safe-bot: env(safe-area-inset-bottom, 0px);
+    --bf-blue: #8fc0f6; --bf-green: #7ed07e; --bf-amber: #f4c65a; --bf-red: #f0a0a0;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; min-width: 0; }
   html, body { margin: 0; height: 100%; width: 100%; max-width: 100%; overflow-x: hidden; }
@@ -38,7 +55,7 @@
   /* ── Header ── */
   header {
     position: sticky; top: 0; z-index: 20;
-    background: rgba(13,13,13,0.92); backdrop-filter: blur(12px);
+    background: var(--bar); backdrop-filter: blur(12px);
     padding: calc(12px + var(--safe-top)) 16px 12px;
     border-bottom: 1px solid var(--hair);
   }
@@ -83,10 +100,10 @@
   /* corner conversion badge on funnel-stage tiles */
   .tile .badge { position: absolute; top: 12px; right: 12px; font-size: 12px; font-weight: 700;
     font-variant-numeric: tabular-nums; padding: 2px 9px; border-radius: 999px;
-    background: rgba(57,135,229,0.16); color: #8fc0f6; border: 1px solid rgba(57,135,229,0.30); }
-  .tile .badge.warn { background: rgba(250,178,25,0.14); color: #f4c65a; border-color: rgba(250,178,25,0.30); }
-  .tile .badge.bad  { background: rgba(208,59,59,0.16); color: #f0a0a0; border-color: rgba(208,59,59,0.32); }
-  .tile .badge.over { background: rgba(12,163,12,0.16); color: #7ed07e; border-color: rgba(12,163,12,0.32); }
+    background: rgba(42,120,214,0.14); color: var(--bf-blue); border: 1px solid rgba(42,120,214,0.28); }
+  .tile .badge.warn { background: rgba(250,178,25,0.16); color: var(--bf-amber); border-color: rgba(250,178,25,0.34); }
+  .tile .badge.bad  { background: rgba(208,59,59,0.14); color: var(--bf-red); border-color: rgba(208,59,59,0.30); }
+  .tile .badge.over { background: rgba(12,163,12,0.14); color: var(--bf-green); border-color: rgba(12,163,12,0.30); }
   .tile .label { color: var(--text-2); font-size: 12.5px; font-weight: 600;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tile .val { font-size: 28px; font-weight: 750; letter-spacing: -0.02em; margin-top: 6px;
@@ -113,7 +130,7 @@
   .kv .v { font-weight: 700; font-size: 15px; }
 
   .empty { color: var(--muted); text-align: center; padding: 40px 20px; font-size: 14px; }
-  .err { background: rgba(208,59,59,0.12); border: 1px solid var(--critical); color: #f3b0b0;
+  .err { background: rgba(208,59,59,0.12); border: 1px solid var(--critical); color: var(--bf-red);
     border-radius: 12px; padding: 10px 14px; font-size: 12.5px; margin-bottom: 12px; }
   .skeleton { background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
     background-size: 200% 100%; animation: sh 1.2s infinite; border-radius: 16px; }
@@ -122,7 +139,7 @@
   /* ── Bottom tabs ── */
   nav {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
-    display: flex; background: rgba(13,13,13,0.94); backdrop-filter: blur(12px);
+    display: flex; background: var(--bar); backdrop-filter: blur(12px);
     border-top: 1px solid var(--hair);
     padding-bottom: var(--safe-bot);
   }
@@ -161,6 +178,7 @@
 <header>
   <div class="fn-row">
     <select class="funnel" id="funnelSel"></select>
+    <button class="icon-btn" id="themeBtn" title="Theme">◐</button>
     <button class="icon-btn" id="refreshBtn" title="Refresh">⟳</button>
   </div>
   <div class="ranges" id="ranges">
@@ -195,6 +213,17 @@
 <script>
 const $ = (s, r=document) => r.querySelector(s);
 let RANGE = '30d', FUNNEL = null, DATA = null;
+
+// ── Theme (default light; persisted) ──
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('ffc_theme', t);
+  const c = t === 'dark' ? '#0d0d0d' : '#f4f4f1';
+  const m = document.getElementById('themeColor'); if (m) m.setAttribute('content', c);
+}
+applyTheme(new URLSearchParams(location.search).get('theme') || localStorage.getItem('ffc_theme') || 'light');
+document.getElementById('themeBtn').onclick = () =>
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 
 const money = n => n == null ? '—' : '$' + Math.round(n).toLocaleString();
 const money2 = n => n == null ? '—' : '$' + n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
