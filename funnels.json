@@ -1,0 +1,41 @@
+{
+  "_note": "Edit names/order freely. Each funnel can pull from GHL (deep funnel + cash) and/or Whop (spend, ROAS, CAC). ghlTags maps funnel stages to GHL tags. whopBiz = Whop business id (key resolved from env WHOP_KEY_<biz> or credentials file).",
+  "funnels": [
+    {
+      "id": "ai-challenge",
+      "name": "AI Challenge",
+      "ghl": {
+        "locationId": "tXCdfKQO75A9wknq5eOa",
+        "tags": {
+          "signup": "purchase",
+          "lead": "manychat-lead",
+          "booked": "call-booked",
+          "show": "call-showed",
+          "close": "closed-won"
+        },
+        "cashFieldId": "F4xa3p0VT8FYpsKduvaM"
+      },
+      "whopBiz": "biz_nSTT7KkzzKeMWw"
+    },
+    {
+      "id": "faceless-reels-lab",
+      "name": "Faceless Reels Lab",
+      "whopBiz": "biz_nSTT7KkzzKeMWw"
+    },
+    {
+      "id": "licensee-fc73",
+      "name": "Licensee — fc73",
+      "whopBiz": "biz_7lGH90386vTqal"
+    },
+    {
+      "id": "licensee-fc74",
+      "name": "Licensee — fc74",
+      "whopBiz": "biz_c7WtO4IqmpqJ33"
+    },
+    {
+      "id": "licensee-owpj",
+      "name": "Licensee — owpj",
+      "whopBiz": "biz_owpjisarwXfq8r"
+    }
+  ]
+}
