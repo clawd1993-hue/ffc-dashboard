@@ -1,9 +1,4 @@
 {
-  "faceless-reels-lab": [
-    { "date": "2026-09-27", "cpc": 0.82, "epc": 0.74 },
-    { "date": "2026-09-28", "cpc": 0.79, "epc": 0.88 }
-  ],
-  "ai-challenge": [
-    { "date": "2026-09-28", "cpc": 0.93, "epc": 1.04 }
-  ]
+  "faceless-reels-lab": [],
+  "ai-challenge": []
 }

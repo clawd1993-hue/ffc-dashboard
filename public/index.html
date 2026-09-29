@@ -407,17 +407,20 @@ function renderLog(funnelName, entries) {
   if (!entries.length) {
     return sel + `<div class="empty">No entries yet for ${funnelName}.<br>Text me CPC + EPC and I'll log it. 📊</div>`;
   }
-  const latest = entries[0];
-  const r = latest.cpc>0 ? latest.epc/latest.cpc : null;
+  const n = entries.length;
+  const avgCpc = entries.reduce((a,e)=>a+e.cpc,0)/n;
+  const avgEpc = entries.reduce((a,e)=>a+e.epc,0)/n;
+  const r = avgCpc>0 ? avgEpc/avgCpc : null;
   const good = r!=null && r>=1;
+  const nlbl = `${n} log${n>1?'s':''}`;
   const hero = `<div class="hero-ratio ${r==null?'':(good?'good':'bad')}">
       <div class="big num">${ratio2(r)}</div>
-      <div class="cap">EPC ÷ CPC${r!=null?(good?' · profitable':' · underwater'):''}</div>
-      <div class="asof">as of ${latest.date}</div>
+      <div class="cap">avg EPC ÷ avg CPC${r!=null?(good?' · profitable':' · underwater'):''}</div>
+      <div class="asof">${nlbl} · latest ${entries[0].date}</div>
     </div>`;
   const pair = `<div class="pair">
-      ${tile('CPC', money2(latest.cpc), 'cost per click')}
-      ${tile('EPC', money2(latest.epc), 'earnings per click')}
+      ${tile('Avg CPC', money2(avgCpc), `across ${nlbl}`)}
+      ${tile('Avg EPC', money2(avgEpc), `across ${nlbl}`)}
     </div>`;
   const hist = entries.length>1 ? `<div class="section-label" style="margin-top:20px">History</div>
     <div class="card loghist">
