@@ -278,6 +278,33 @@ app.post('/api/refresh', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Manual CPC/EPC log (Michael texts numbers → Billy logs them) ──────────────
+// Stored in logdata.json (in the repo, so it survives redeploys). Source of truth
+// is also mirrored in Billy's workspace memory.
+const LOG_FILE = path.join(__dirname, 'logdata.json');
+const LOG_FUNNELS = ['faceless-reels-lab', 'ai-challenge'];
+function readLog() { try { return JSON.parse(fs.readFileSync(LOG_FILE, 'utf8')); } catch { return {}; } }
+function writeLog(d) { fs.writeFileSync(LOG_FILE, JSON.stringify(d, null, 2)); }
+
+app.get('/api/log-funnels', requireAuth, (req, res) => {
+  res.json({ funnels: LOG_FUNNELS.map(id => ({ id, name: (FUNNELS.find(f => f.id === id) || {}).name || id })) });
+});
+app.get('/api/log/:funnel', requireAuth, (req, res) => {
+  const all = readLog();
+  const entries = (all[req.params.funnel] || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  res.json({ funnel: req.params.funnel, entries });
+});
+app.post('/api/log/:funnel', requireAuth, (req, res) => {
+  const { cpc, epc, date } = req.body || {};
+  if (cpc == null || epc == null || isNaN(Number(cpc)) || isNaN(Number(epc)))
+    return res.status(400).json({ error: 'need numeric cpc and epc' });
+  const all = readLog();
+  const arr = all[req.params.funnel] || (all[req.params.funnel] = []);
+  arr.push({ date: date || new Date().toISOString().slice(0, 10), cpc: Number(cpc), epc: Number(epc) });
+  writeLog(all);
+  res.json({ ok: true, count: arr.length });
+});
+
 app.get('/api/health', (req, res) => res.json({ ok: true, funnels: FUNNELS.length }));
 
 app.use(express.static(path.join(__dirname, 'public')));
