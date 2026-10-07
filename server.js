@@ -40,8 +40,8 @@ app.use(cookieParser());
 
 // ── Dummy data (feel-test mode) ──────────────────────────────────────────
 function dummyFunnel(id, range) {
-  const factor = { today: 1/30, '7d': 7/30, '30d': 1, '90d': 3 }[range] ?? 1;
-  const days = { today: 1, '7d': 7, '30d': 30, '90d': 90 }[range] ?? 30;
+  const factor = { today: 1/30, '7d': 7/30, '30d': 1, '90d': 3, all: 5 }[range] ?? 1;
+  const days = { today: 1, '7d': 7, '30d': 30, '90d': 90, all: 280 }[range] ?? 30;
   const R = n => Math.max(0, Math.round(n * factor));
   // per-funnel base (roughly realistic shapes)
   const base = {
@@ -127,6 +127,11 @@ function rangeWindow(range) {
   const now = new Date();
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const day = 864e5;
+  if (range === 'all') {
+    const from = new Date('2026-01-01T00:00:00');
+    const to = new Date(startToday.getTime() + day);
+    return { from, to, days: Math.max(1, Math.round((to - from) / day)) };
+  }
   const map = { today: 0, '7d': 7, '30d': 30, '90d': 90 };
   const days = map[range] ?? 30;
   const from = days === 0 ? startToday : new Date(startToday.getTime() - days * day);
