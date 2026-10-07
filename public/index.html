@@ -48,7 +48,7 @@
     background: var(--page); color: var(--text);
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     font-size: 15px; line-height: 1.4; overflow-x: hidden;
-    padding-bottom: calc(64px + var(--safe-bot));
+    padding-bottom: calc(28px + var(--safe-bot));
   }
   .num { font-variant-numeric: tabular-nums; }
 
@@ -190,25 +190,8 @@
 </header>
 
 <main>
-  <div class="tab-page on" id="tab-overview"></div>
-  <div class="tab-page" id="tab-funnel"></div>
-  <div class="tab-page" id="tab-ads"></div>
+  <div id="content"></div>
 </main>
-
-<nav id="nav">
-  <button data-t="overview" class="on">
-    <svg viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg>
-    Overview
-  </button>
-  <button data-t="funnel">
-    <svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>
-    Funnel
-  </button>
-  <button data-t="ads">
-    <svg viewBox="0 0 24 24"><path d="M3 11l18-7-4 18-5-6-3 4z"/></svg>
-    Ads
-  </button>
-</nav>
 
 <script>
 const $ = (s, r=document) => r.querySelector(s);
@@ -246,12 +229,6 @@ $('#loginBtn').onclick = async () => {
 };
 $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('#loginBtn').click(); });
 
-// ── Tabs ──
-document.querySelectorAll('#nav button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('#nav button').forEach(x => x.classList.toggle('on', x===b));
-  document.querySelectorAll('.tab-page').forEach(p => p.classList.toggle('on', p.id === 'tab-'+b.dataset.t));
-});
-
 // ── Ranges ──
 $('#ranges').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -268,36 +245,27 @@ function tile(label, val, sub, cls='') {
     <div><div class="val ${val && val.length>8?'sm':''}">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div></div>`;
 }
 
-function renderOverview(d) {
-  const g = d.ghl, w = d.whop, c = d.combined;
-  if (!g && !w) return `<div class="empty">No data source wired for this funnel yet.</div>`;
-  let cards = [];
-  // headline: cash collected
-  if (g) cards.push(tile('Cash Collected', money(g.cashCollected), `${d.range.toUpperCase()} · ${int(g.closes)} closes`, 'wide'));
+// ── Single page: Ads bubbles (6) + funnel below ──
+function renderPage(d) {
+  const g = d.ghl, w = d.whop;
+  // 6 ad bubbles (3 rows of 2)
+  const cac    = w && w.cac != null ? w.cac : null;                           // spend ÷ purchases
+  const aov    = (w && w.purchases) ? w.purchaseValue / w.purchases : null;    // avg order value (front-end)
+  const cpc    = (w && w.clicks)    ? w.spend / w.clicks : null;               // cost per click
+  const epc    = (w && w.clicks)    ? w.purchaseValue / w.clicks : null;       // earnings per click
+  const cpcall = w && w.costPerBookedCall != null ? w.costPerBookedCall : null;// cost per booked call
+  const ltgp   = (g && g.closes)    ? g.cashCollected / g.closes : null;       // gross profit per customer (proxy)
+  const adBubbles = [
+    tile('CAC', money2(cac), 'cost to acquire'),
+    tile('AOV', money2(aov), 'avg order value'),
+    tile('CPC', money2(cpc), 'cost per click'),
+    tile('EPC', money2(epc), 'earnings per click'),
+    tile('Cost / Call', money2(cpcall), 'per booked call'),
+    tile('LTGP / Cust', money(ltgp), 'gross profit / cust'),
+  ].join('');
 
-  // the money truth: real ROAS + cost per close (GHL cash vs ad spend)
-  if (c) {
-    const rc = c.trueRoas>=1 ? 'var(--good)' : 'var(--critical)';
-    cards.push(tile('True ROAS', c.trueRoas.toFixed(1)+'×',
-      `<span class="dot" style="background:${rc}"></span>cash ÷ spend`));
-    cards.push(tile('Cost / Close', c.costPerClose==null?'—':money2(c.costPerClose), 'ad spend ÷ closes'));
-  }
-  if (g) {
-    cards.push(tile('Avg Cash / Day', money(g.avgCashPerDay), `over ${d.range}`));
-    cards.push(tile('Avg Deal Size', money(g.avgDealSize), 'per close'));
-  }
-  // Whop CAC / spend
-  if (w) {
-    cards.push(tile('CAC', w.cac==null?'—':money2(w.cac), 'spend / challenge buyer'));
-    cards.push(tile('Ad Spend', money(w.spend), `${int(w.activeAds)}/${int(w.totalAds)} ads active`));
-    if (!c) { // whop-only funnel: show whop's own ROAS
-      const roasColor = w.roas==null ? 'var(--muted)' : (w.roas>=1 ? 'var(--good)' : 'var(--critical)');
-      cards.push(tile('ROAS', w.roas==null?'—':w.roas.toFixed(2)+'×',
-        `<span class="dot" style="background:${roasColor}"></span>${w.roas>=1?'profitable':'under 1×'}`));
-    }
-  }
-  // ── Funnel stage bubbles: whole number + conversion % from the stage above (top-right) ──
-  let stagesHtml = '';
+  // funnel stage bubbles (whole number + conversion % from the stage above)
+  let funnelHtml;
   if (g) {
     const defs = [['signups','Signups'],['leads','Leads'],['booked','Booked'],['shows','Shows'],['closes','Closes']];
     const stageTiles = defs.map(([k,name], i) => {
@@ -313,60 +281,24 @@ function renderOverview(d) {
       return `<div class="tile stage">${badge}<div class="label">${name}</div>
         <div><div class="val num">${int(v)}</div><div class="sub">${sub}</div></div></div>`;
     }).join('');
-    stagesHtml = `<div class="section-label" style="margin-top:20px">Funnel · ${d.range.toUpperCase()}</div>
-      <div class="grid">${stageTiles}</div>`;
+    funnelHtml = `<div class="section-label" style="margin-top:22px">Funnel · ${d.range.toUpperCase()}</div>
+      <div class="grid">${stageTiles}</div>
+      <div class="card" style="margin-top:12px">
+        <div class="kv"><span class="k">Signup → Booked</span><span class="v num">${pct(g.conv.signupToBooked)}</span></div>
+        <div class="kv"><span class="k">Booked → Show</span><span class="v num">${pct(g.conv.bookedToShow)}</span></div>
+        <div class="kv"><span class="k">Show → Close</span><span class="v num">${pct(g.conv.showToClose)}</span></div>
+        <div class="kv"><span class="k">Cash Collected</span><span class="v num">${money(g.cashCollected)}</span></div>
+      </div>`;
+  } else {
+    funnelHtml = `<div class="section-label" style="margin-top:22px">Funnel</div>
+      <div class="empty">No GHL funnel pipeline for this funnel yet.</div>`;
   }
-  return `<div class="section-label">${d.name} · ${d.range.toUpperCase()}${d.demo?' · <span style="color:#f4c65a">DEMO DATA</span>':''}</div>
-    ${d.errors?.length?`<div class="err">${d.errors.join(' · ')}</div>`:''}
-    <div class="grid">${cards.join('')}</div>
-    ${c?`<div class="sub" style="color:var(--muted);font-size:11px;text-align:center;margin-top:10px">True ROAS & Cost/Close use ${c.spendNote}.</div>`:''}
-    ${stagesHtml}`;
-}
 
-const STAGES = [
-  ['signups','Signups','--o1'], ['leads','Leads','--o2'], ['booked','Booked','--o3'],
-  ['shows','Shows','--o4'], ['closes','Closes','--o5']
-];
-function renderFunnel(d) {
-  const g = d.ghl;
-  if (!g) return `<div class="empty">This funnel has no GHL deep-funnel pipeline.<br>See the <b>Ads</b> tab for Whop metrics.</div>`;
-  const max = Math.max(g.signups, 1);
-  let bars = STAGES.map(([k,name,c], i) => {
-    const v = g[k]; const prev = i>0 ? g[STAGES[i-1][0]] : null;
-    const conv = prev ? (prev? v/prev : null) : null;
-    const w = Math.max((v/max)*100, v>0?3:0);
-    return `<div class="fbar"><div class="top"><span class="name">${name}</span><span class="cnt num">${int(v)}</span></div>
-      <div class="track"><div class="fill" style="width:${w}%;background:var(${c})"></div></div>
-      ${i>0?`<div class="conv">${pct(conv)} from ${STAGES[i-1][1]}</div>`:''}</div>`;
-  }).join('');
-  return `<div class="section-label">${d.name} funnel · ${d.range.toUpperCase()}</div>
-    <div class="card">${bars}</div>
-    <div class="card">
-      <div class="kv"><span class="k">Signup → Booked</span><span class="v num">${pct(g.conv.signupToBooked)}</span></div>
-      <div class="kv"><span class="k">Booked → Show</span><span class="v num">${pct(g.conv.bookedToShow)}</span></div>
-      <div class="kv"><span class="k">Show → Close</span><span class="v num">${pct(g.conv.showToClose)}</span></div>
-      <div class="kv"><span class="k">Cash Collected</span><span class="v num">${money(g.cashCollected)}</span></div>
-    </div>`;
-}
-
-function renderAds(d) {
-  const w = d.whop;
-  if (!w) return `<div class="empty">No Whop ad account linked to this funnel.</div>`;
-  return `<div class="section-label">${d.name} · ad account</div>
-    <div class="grid">
-      ${tile('Spend', money(w.spend), `${int(w.activeAds)}/${int(w.totalAds)} ads active`)}
-      ${tile('ROAS', w.roas==null?'—':w.roas.toFixed(2)+'×', w.roas>=1?'profitable':'under 1×')}
-      ${tile('CAC', w.cac==null?'—':money2(w.cac), 'per purchase')}
-      ${tile('Purchases', int(w.purchases), money(w.purchaseValue)+' value')}
-    </div>
-    <div class="card" style="margin-top:12px">
-      <div class="kv"><span class="k">Cost / Lead</span><span class="v num">${w.costPerLead==null?'—':money2(w.costPerLead)}</span></div>
-      <div class="kv"><span class="k">Cost / Booked Call</span><span class="v num">${w.costPerBookedCall==null?'—':money2(w.costPerBookedCall)}</span></div>
-      <div class="kv"><span class="k">Leads</span><span class="v num">${int(w.leads)}</span></div>
-      <div class="kv"><span class="k">Clicks</span><span class="v num">${int(w.clicks)}</span></div>
-      <div class="kv"><span class="k">Impressions</span><span class="v num">${int(w.impressions)}</span></div>
-    </div>
-    <div class="sub" style="color:var(--muted);font-size:11px;text-align:center;margin-top:8px">Whop ad metrics are ad-account totals (not filtered by the date range above).</div>`;
+  return `${d.demo ? '<div class="section-label"><span style="color:#f4c65a">DEMO DATA</span></div>' : ''}
+    ${d.errors && d.errors.length ? `<div class="err">${d.errors.join(' · ')}</div>` : ''}
+    <div class="section-label">Ads · ${d.range.toUpperCase()}</div>
+    <div class="grid">${adBubbles}</div>
+    ${funnelHtml}`;
 }
 
 function skeleton() {
@@ -375,13 +307,11 @@ function skeleton() {
 
 async function load() {
   if (!FUNNEL) return;
-  $('#tab-overview').innerHTML = skeleton();
+  $('#content').innerHTML = skeleton();
   try {
     DATA = await api(`/api/funnel/${FUNNEL}?range=${RANGE}`);
-    $('#tab-overview').innerHTML = renderOverview(DATA);
-    $('#tab-funnel').innerHTML   = renderFunnel(DATA);
-    $('#tab-ads').innerHTML      = renderAds(DATA);
-  } catch(e) { if (e.message!=='auth') $('#tab-overview').innerHTML = `<div class="err">${e.message}</div>`; }
+    $('#content').innerHTML = renderPage(DATA);
+  } catch(e) { if (e.message!=='auth') $('#content').innerHTML = `<div class="err">${e.message}</div>`; }
 }
 
 async function boot() {
@@ -391,15 +321,8 @@ async function boot() {
   load();
 }
 
-// deep-link a tab via #hash (e.g. #log) — also lets screenshots target a tab
-function openTabFromHash() {
-  const t = (location.hash || '').replace('#','');
-  const btn = document.querySelector(`#nav button[data-t="${t}"]`);
-  if (btn) btn.click();
-}
-
 // try to boot; if unauthorized, login screen shows
-boot().then(openTabFromHash).catch(()=>{});
+boot().catch(()=>{});
 </script>
 </body>
 </html>
