@@ -4,6 +4,17 @@
     {
       "id": "ai-challenge",
       "name": "AI Creator Challenge",
+      "ghl": {
+        "locationId": "tXCdfKQO75A9wknq5eOa",
+        "tags": {
+          "signup": "purchase",
+          "lead": "manychat-lead",
+          "booked": "call-booked",
+          "show": "call-showed",
+          "close": "closed-won"
+        },
+        "cashFieldId": "F4xa3p0VT8FYpsKduvaM"
+      },
       "whopBiz": "biz_JZgEom4rjrp0s3"
     },
     {

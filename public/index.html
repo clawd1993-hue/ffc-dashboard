@@ -267,22 +267,19 @@ function renderPage(d) {
   // funnel stage bubbles (whole number + conversion % from the stage above)
   let funnelHtml;
   if (g) {
-    const defs = [['signups','Signups'],['leads','Leads'],['booked','Booked'],['shows','Shows'],['closes','Closes']];
-    const stageTiles = defs.map(([k,name], i) => {
+    const stages = [['signups','Signups','--o1'],['leads','Leads','--o2'],['booked','Booked','--o3'],['shows','Shows','--o4'],['closes','Closes','--o5']];
+    const max = Math.max(g.signups, 1);
+    const bars = stages.map(([k,name,c], i) => {
       const v = g[k];
-      const prev = i > 0 ? g[defs[i-1][0]] : null;
+      const prev = i > 0 ? g[stages[i-1][0]] : null;
       const conv = (prev != null && prev > 0) ? v / prev : null;
-      let badge = '';
-      if (conv != null) {
-        const cls = conv > 1 ? 'over' : (conv < 0.15 ? 'bad' : (conv < 0.25 ? 'warn' : ''));
-        badge = `<span class="badge ${cls}">${pct(conv)}</span>`;
-      }
-      const sub = i === 0 ? 'top of funnel' : `from ${defs[i-1][1]}`;
-      return `<div class="tile stage">${badge}<div class="label">${name}</div>
-        <div><div class="val num">${int(v)}</div><div class="sub">${sub}</div></div></div>`;
+      const w = Math.max((v / max) * 100, v > 0 ? 3 : 0);
+      return `<div class="fbar"><div class="top"><span class="name">${name}</span><span class="cnt num">${int(v)}</span></div>
+        <div class="track"><div class="fill" style="width:${w}%;background:var(${c})"></div></div>
+        ${i>0?`<div class="conv">${pct(conv)} from ${stages[i-1][1]}</div>`:''}</div>`;
     }).join('');
     funnelHtml = `<div class="section-label" style="margin-top:22px">Funnel · ${d.range.toUpperCase()}</div>
-      <div class="grid">${stageTiles}</div>
+      <div class="card">${bars}</div>
       <div class="card" style="margin-top:12px">
         <div class="kv"><span class="k">Signup → Booked</span><span class="v num">${pct(g.conv.signupToBooked)}</span></div>
         <div class="kv"><span class="k">Booked → Show</span><span class="v num">${pct(g.conv.bookedToShow)}</span></div>

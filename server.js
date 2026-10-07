@@ -45,8 +45,8 @@ function dummyFunnel(id, range) {
   const R = n => Math.max(0, Math.round(n * factor));
   // per-funnel base (roughly realistic shapes)
   const base = {
-    // ai-challenge = AI Creator Challenge Whop account (biz_JZgEom4rjrp0s3), whop-only for now
-    'ai-challenge':      { su:0,   ld:0,  bk:0,   sh:0,  cl:0,  cash:0,     spend:95,   purch:2,  pval:14  },
+    // ai-challenge = AI Creator Whop account (biz_JZgEom4rjrp0s3) + shared FFC GHL deep funnel (tXCdfKQO, commingled)
+    'ai-challenge':      { su:302, ld:93, bk:104, sh:17, cl:11, cash:26591, spend:95,   purch:2,  pval:14  },
     // faceless-reels-lab = FFC GHL deep funnel (tXCdfKQO) + its own Whop account (biz_nSTT…)
     'faceless-reels-lab':{ su:302, ld:93, bk:104, sh:17, cl:11, cash:26591, spend:1137, purch:19, pval:132 },
     'licensee-mckenzie': { su:0,   ld:0,  bk:0,   sh:0,  cl:0,  cash:0,     spend:82,   purch:4,  pval:28  },
