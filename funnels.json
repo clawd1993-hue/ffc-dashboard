@@ -32,12 +32,6 @@
         "cashFieldId": "F4xa3p0VT8FYpsKduvaM"
       },
       "whopBiz": "biz_nSTT7KkzzKeMWw"
-    },
-    { "id": "licensee-mckenzie", "name": "McKenzie", "whopBiz": "biz_owpjisarwXfq8r" },
-    { "id": "licensee-jessica",  "name": "Jessica",  "whopBiz": "biz_7lGH90386vTqal" },
-    { "id": "licensee-ivana",    "name": "Ivana",    "whopBiz": "biz_c7WtO4IqmpqJ33" },
-    { "id": "licensee-livia",    "name": "Livia",    "whopBiz": "biz_bYfJrCYZK5KFzO" },
-    { "id": "licensee-jesslynn", "name": "Jesslynn", "whopBiz": "biz_4LMdVJCFvqjn7J" },
-    { "id": "licensee-sandra",   "name": "Sandra",   "whopBiz": "biz_eCFVMHAmGmkg4P" }
+    }
   ]
 }

@@ -49,9 +49,6 @@ function dummyFunnel(id, range) {
     'ai-challenge':      { su:302, ld:93, bk:104, sh:17, cl:11, cash:26591, spend:95,   purch:2,  pval:14  },
     // faceless-reels-lab = FFC GHL deep funnel (tXCdfKQO) + its own Whop account (biz_nSTT…)
     'faceless-reels-lab':{ su:302, ld:93, bk:104, sh:17, cl:11, cash:26591, spend:1137, purch:19, pval:132 },
-    'licensee-mckenzie': { su:0,   ld:0,  bk:0,   sh:0,  cl:0,  cash:0,     spend:82,   purch:4,  pval:28  },
-    'licensee-jessica':  { su:0,   ld:0,  bk:0,   sh:0,  cl:0,  cash:0,     spend:138,  purch:6,  pval:42  },
-    'licensee-ivana':    { su:0,   ld:0,  bk:0,   sh:0,  cl:0,  cash:0,     spend:81,   purch:3,  pval:21  },
   }[id] || { su:0, ld:0, bk:0, sh:0, cl:0, cash:0, spend:0, purch:0, pval:0 };
   const cfg = FUNNELS.find(f => f.id === id) || {};
   const out = { id, name: cfg.name || id, range, ghl: null, whop: null, errors: [], demo: true };
