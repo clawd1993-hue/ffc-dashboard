@@ -1,9 +1,14 @@
 {
-  "_note": "Edit names/order freely. Each funnel can pull from GHL (deep funnel + cash) and/or Whop (spend, ROAS, CAC). ghlTags maps funnel stages to GHL tags. whopBiz = Whop business id (key resolved from env WHOP_KEY_<biz> or credentials file).",
+  "_note": "Per CF-WHOP-TRACKING-BIBLE: AI Creator Challenge and Faceless Reels Lab are SEPARATE Whop accounts — never commingle. Per-funnel separation lives in Whop (biz_). GHL location tXCdfKQO = 'Faceless Funnel Challenge' (FFC core: signups/leads/booked/shows/closes/cash). ai-challenge GHL location = TBD (does AI Creator land in tXCdfKQO too, or its own location? confirm with Michael). Licensees = whop-only (their own GHL sub-accounts).",
   "funnels": [
     {
       "id": "ai-challenge",
-      "name": "AI Challenge",
+      "name": "AI Creator Challenge",
+      "whopBiz": "biz_JZgEom4rjrp0s3"
+    },
+    {
+      "id": "faceless-reels-lab",
+      "name": "Faceless Reels Lab",
       "ghl": {
         "locationId": "tXCdfKQO75A9wknq5eOa",
         "tags": {
@@ -17,25 +22,11 @@
       },
       "whopBiz": "biz_nSTT7KkzzKeMWw"
     },
-    {
-      "id": "faceless-reels-lab",
-      "name": "Faceless Reels Lab",
-      "whopBiz": "biz_nSTT7KkzzKeMWw"
-    },
-    {
-      "id": "licensee-fc73",
-      "name": "Licensee — fc73",
-      "whopBiz": "biz_7lGH90386vTqal"
-    },
-    {
-      "id": "licensee-fc74",
-      "name": "Licensee — fc74",
-      "whopBiz": "biz_c7WtO4IqmpqJ33"
-    },
-    {
-      "id": "licensee-owpj",
-      "name": "Licensee — owpj",
-      "whopBiz": "biz_owpjisarwXfq8r"
-    }
+    { "id": "licensee-mckenzie", "name": "McKenzie", "whopBiz": "biz_owpjisarwXfq8r" },
+    { "id": "licensee-jessica",  "name": "Jessica",  "whopBiz": "biz_7lGH90386vTqal" },
+    { "id": "licensee-ivana",    "name": "Ivana",    "whopBiz": "biz_c7WtO4IqmpqJ33" },
+    { "id": "licensee-livia",    "name": "Livia",    "whopBiz": "biz_bYfJrCYZK5KFzO" },
+    { "id": "licensee-jesslynn", "name": "Jesslynn", "whopBiz": "biz_4LMdVJCFvqjn7J" },
+    { "id": "licensee-sandra",   "name": "Sandra",   "whopBiz": "biz_eCFVMHAmGmkg4P" }
   ]
 }
