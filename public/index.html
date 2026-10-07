@@ -129,28 +129,6 @@
   .kv .k { color: var(--text-2); font-size: 14px; }
   .kv .v { font-weight: 700; font-size: 15px; }
 
-  /* ── Log tab ── */
-  .log-sel { width: 100%; appearance: none; background: var(--surface); color: var(--text);
-    border: 1px solid var(--hair); border-radius: 12px; padding: 12px 38px 12px 14px;
-    font-size: 16px; font-weight: 650; margin-bottom: 16px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none' stroke='%23898781' stroke-width='2'%3E%3Cpath d='M5 8l5 5 5-5'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 12px center; }
-  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .pair .tile { align-items: center; text-align: center; }
-  .pair .tile .val { font-size: 32px; }
-  .hero-ratio { background: var(--surface); border: 1px solid var(--hair); border-radius: 20px;
-    padding: 28px 16px; text-align: center; margin: 12px 0; }
-  .hero-ratio .big { font-size: 64px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
-  .hero-ratio .cap { color: var(--muted); font-size: 13px; margin-top: 10px; font-weight: 600; }
-  .hero-ratio .asof { color: var(--muted); font-size: 12px; margin-top: 2px; }
-  .hero-ratio.good .big { color: var(--good); }
-  .hero-ratio.bad .big { color: var(--critical); }
-  .loghist .row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; align-items: center;
-    padding: 11px 4px; border-bottom: 1px solid var(--hair); font-size: 14px; font-variant-numeric: tabular-nums; }
-  .loghist .row:last-child { border-bottom: none; }
-  .loghist .hd { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-  .loghist .rt { font-weight: 700; }
-  .loghist .rt.g { color: var(--good); } .loghist .rt.b { color: var(--critical); }
   .empty { color: var(--muted); text-align: center; padding: 40px 20px; font-size: 14px; }
   .err { background: rgba(208,59,59,0.12); border: 1px solid var(--critical); color: var(--bf-red);
     border-radius: 12px; padding: 10px 14px; font-size: 12.5px; margin-bottom: 12px; }
@@ -215,7 +193,6 @@
   <div class="tab-page on" id="tab-overview"></div>
   <div class="tab-page" id="tab-funnel"></div>
   <div class="tab-page" id="tab-ads"></div>
-  <div class="tab-page" id="tab-log"></div>
 </main>
 
 <nav id="nav">
@@ -230,10 +207,6 @@
   <button data-t="ads">
     <svg viewBox="0 0 24 24"><path d="M3 11l18-7-4 18-5-6-3 4z"/></svg>
     Ads
-  </button>
-  <button data-t="log">
-    <svg viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l4 4"/></svg>
-    Log
   </button>
 </nav>
 
@@ -277,7 +250,6 @@ $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('#loginBtn'
 document.querySelectorAll('#nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('#nav button').forEach(x => x.classList.toggle('on', x===b));
   document.querySelectorAll('.tab-page').forEach(p => p.classList.toggle('on', p.id === 'tab-'+b.dataset.t));
-  if (b.dataset.t === 'log') loadLog();
 });
 
 // ── Ranges ──
@@ -397,50 +369,6 @@ function renderAds(d) {
     <div class="sub" style="color:var(--muted);font-size:11px;text-align:center;margin-top:8px">Whop ad metrics are ad-account totals (not filtered by the date range above).</div>`;
 }
 
-// ── Log tab (manual CPC/EPC) ──
-let LOG_FUNNEL = null, LOG_FUNNELS = [];
-const ratio2 = n => (n==null||!isFinite(n)) ? '—' : n.toFixed(2)+'x';
-
-function renderLog(funnelName, entries) {
-  const sel = `<select class="log-sel" id="logFunnelSel">${
-    LOG_FUNNELS.map(f => `<option value="${f.id}" ${f.id===LOG_FUNNEL?'selected':''}>${f.name}</option>`).join('')}</select>`;
-  if (!entries.length) {
-    return sel + `<div class="empty">No entries yet for ${funnelName}.<br>Text me CPC + EPC and I'll log it. 📊</div>`;
-  }
-  const n = entries.length;
-  const avgCpc = entries.reduce((a,e)=>a+e.cpc,0)/n;
-  const avgEpc = entries.reduce((a,e)=>a+e.epc,0)/n;
-  const r = avgCpc>0 ? avgEpc/avgCpc : null;
-  const good = r!=null && r>=1;
-  const nlbl = `${n} log${n>1?'s':''}`;
-  const hero = `<div class="hero-ratio ${r==null?'':(good?'good':'bad')}">
-      <div class="big num">${ratio2(r)}</div>
-      <div class="cap">avg EPC ÷ avg CPC${r!=null?(good?' · profitable':' · underwater'):''}</div>
-      <div class="asof">${nlbl} · latest ${entries[0].date}</div>
-    </div>`;
-  const pair = `<div class="pair">
-      ${tile('Avg CPC', money2(avgCpc), `across ${nlbl}`)}
-      ${tile('Avg EPC', money2(avgEpc), `across ${nlbl}`)}
-    </div>`;
-  const hist = entries.length>1 ? `<div class="section-label" style="margin-top:20px">History</div>
-    <div class="card loghist">
-      <div class="row hd"><span>Date</span><span>CPC</span><span>EPC</span><span>Ratio</span></div>
-      ${entries.map(e=>{const er=e.cpc>0?e.epc/e.cpc:null;const g=er!=null&&er>=1;
-        return `<div class="row"><span>${e.date}</span><span>${money2(e.cpc)}</span><span>${money2(e.epc)}</span><span class="rt ${er==null?'':(g?'g':'b')}">${ratio2(er)}</span></div>`;}).join('')}
-    </div>` : '';
-  return sel + hero + pair + hist;
-}
-
-async function loadLog() {
-  if (!LOG_FUNNEL) return;
-  try {
-    const d = await api(`/api/log/${LOG_FUNNEL}`);
-    const fn = (LOG_FUNNELS.find(f=>f.id===LOG_FUNNEL)||{}).name || LOG_FUNNEL;
-    $('#tab-log').innerHTML = renderLog(fn, d.entries||[]);
-    $('#logFunnelSel').onchange = e => { LOG_FUNNEL = e.target.value; loadLog(); };
-  } catch(e) { if (e.message!=='auth') $('#tab-log').innerHTML = `<div class="err">${e.message}</div>`; }
-}
-
 function skeleton() {
   return `<div class="grid">${Array(6).fill('<div class="tile skeleton" style="border:none"></div>').join('')}</div>`;
 }
@@ -461,12 +389,6 @@ async function boot() {
   $('#funnelSel').innerHTML = funnels.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
   FUNNEL = funnels[0]?.id;
   load();
-  // log-tab funnels
-  try {
-    const lf = await api('/api/log-funnels');
-    LOG_FUNNELS = lf.funnels || [];
-    LOG_FUNNEL = LOG_FUNNELS[0]?.id;
-  } catch {}
 }
 
 // deep-link a tab via #hash (e.g. #log) — also lets screenshots target a tab
