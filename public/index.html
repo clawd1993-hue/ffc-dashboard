@@ -250,12 +250,12 @@ function tile(label, val, sub, cls='') {
 function renderPage(d) {
   const g = d.ghl, w = d.whop;
   // 6 ad bubbles (3 rows of 2)
-  const cac    = w && w.cac != null ? w.cac : null;                           // spend ÷ purchases
-  const aov    = (w && w.purchases) ? w.purchaseValue / w.purchases : null;    // avg order value (front-end)
-  const cpc    = (w && w.clicks)    ? w.spend / w.clicks : null;               // cost per click
-  const epc    = (w && w.clicks)    ? w.purchaseValue / w.clicks : null;       // earnings per click
-  const cpcall = w && w.costPerBookedCall != null ? w.costPerBookedCall : null;// cost per booked call
-  const ltgp   = (g && g.closes)    ? g.cashCollected / g.closes : null;       // gross profit per customer (proxy)
+  const cac    = w ? w.cac : null;                                             // spend ÷ front-end buyers
+  const aov    = w ? w.aov : null;                                             // avg order value (incl bumps + OTOs)
+  const cpc    = w ? w.cpc : null;                                             // cost per click
+  const epc    = w ? w.epc : null;                                             // earnings per click (incl bumps + OTOs)
+  const cpcall = w ? w.costPerBookedCall : null;                               // cost per booked call
+  const ltgp   = (g && g.closes)    ? g.cashCollected / g.closes : null;       // gross profit per customer (proxy — pending def)
   const adBubbles = [
     tile('CAC', money2(cac), 'cost to acquire'),
     tile('AOV', money2(aov), 'avg order value'),

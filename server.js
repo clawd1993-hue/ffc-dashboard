@@ -60,9 +60,11 @@ function dummyFunnel(id, range) {
   }
   if (cfg.whopBiz) {
     const spend=base.spend, purch=base.purch;
-    out.whop = { spend, purchases:purch, purchaseValue:base.pval, bookedCalls:3, leads:base.ld||162,
-      clicks:1036, impressions:13980, cac: purch?spend/purch:null, costPerLead: 7.02, costPerBookedCall: 379,
-      roas: spend?base.pval/spend:null, activeAds:4, totalAds:5 };
+    const clicks=1036, rev=base.pval*4;
+    out.whop = { spend, purchases:purch, revenue:rev, bookedCalls:3, leads:base.ld||162,
+      clicks, impressions:13980, cpc: spend/clicks, cac: purch?spend/purch:null, aov: purch?rev/purch:null,
+      epc: rev/clicks, costPerLead: 7.02, costPerBookedCall: 379,
+      roas: spend?rev/spend:null, activeAds:4, totalAds:5 };
   }
   if (out.ghl && out.whop && out.whop.spend>0) {
     const s=out.whop.spend;
@@ -202,33 +204,29 @@ async function whopAds(biz) {
   return ads;
 }
 
+// FFC product set (front-end + bumps + OTOs) → revenue = sum of their Whop custom_event_values
+const WHOP_PRODUCTS = ['purchase', 'bump_22_niches', 'bump_viral_reels', 'oto_dfy_funnel', 'oto_dfy_products', 'downsell'];
 function whopSummary(ads) {
   if (!ads) return null;
   const sum = (k) => ads.reduce((a, x) => a + (Number(x[k]) || 0), 0);
-  const spend = sum('spend');
-  // purchases: prefer explicit purchases, else custom_event_counts.purchase
-  let purchases = sum('purchases');
-  let purchaseValue = sum('purchase_value');
-  let bookedCalls = 0;
+  const spend = sum('spend'), clicks = sum('clicks');
+  let fePurch = 0, revenue = 0, bookedCalls = 0;      // fePurch = front-end ($6.95) buyers
   for (const x of ads) {
-    const cc = x.custom_event_counts || {};
-    const cv = x.custom_event_values || {};
-    if (!x.purchases && cc.purchase) purchases += Number(cc.purchase) || 0;
-    if (!x.purchase_value && cv.purchase) purchaseValue += Number(cv.purchase) || 0;
-    if (cc.booked_call) bookedCalls += Number(cc.booked_call) || 0;
+    const cc = x.custom_event_counts || {}, cv = x.custom_event_values || {};
+    fePurch += Number(cc.purchase) || Number(x.purchases) || 0;
+    bookedCalls += Number(cc.booked_call) || 0;
+    for (const p of WHOP_PRODUCTS) revenue += Number(cv[p]) || 0;   // front-end + bumps + OTOs $
   }
   return {
-    spend,
-    purchases,
-    purchaseValue,
-    bookedCalls,
-    leads: sum('leads'),
-    clicks: sum('clicks'),
-    impressions: sum('impressions'),
-    cac: purchases ? spend / purchases : null,       // cost per challenge purchase
+    spend, clicks, impressions: sum('impressions'), leads: sum('leads'),
+    purchases: fePurch, revenue, bookedCalls,
+    cpc: clicks ? spend / clicks : null,                 // cost per click
+    cac: fePurch ? spend / fePurch : null,               // cost per front-end buyer
+    aov: fePurch ? revenue / fePurch : null,             // avg order value (incl bumps + OTOs)
+    epc: clicks ? revenue / clicks : null,               // earnings per click (incl bumps + OTOs)
     costPerLead: sum('leads') ? spend / sum('leads') : null,
     costPerBookedCall: bookedCalls ? spend / bookedCalls : null,
-    roas: spend ? purchaseValue / spend : null,
+    roas: spend ? revenue / spend : null,
     activeAds: ads.filter(a => a.status === 'active').length,
     totalAds: ads.length
   };
