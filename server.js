@@ -86,7 +86,7 @@ app.post('/api/login', (req, res) => {
   res.status(401).json({ ok: false, error: 'Wrong password' });
 });
 function requireAuth(req, res, next) {
-  if (DUMMY || process.env.DEV_OPEN) return next(); // demo mode / local dev = open
+  if (DUMMY || process.env.DEV_OPEN || !process.env.DASH_PASSWORD) return next(); // open when no password set
   if (authed(req)) return next();
   res.status(401).json({ error: 'Unauthorized' });
 }
