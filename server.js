@@ -18,6 +18,15 @@ const PORT = process.env.PORT || 3460;
 // ── Config ──────────────────────────────────────────────────────────────
 const GHL_API_KEY = process.env.GHL_API_KEY || ''; // set via env on the server; never hardcode
 const GHL_BASE = 'https://services.leadconnectorhq.com';
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
+const HT_LOCATION = 'tXCdfKQO75A9wknq5eOa';   // FFC GHL location (both funnels' closed-won live here)
+const HT_CASH_FIELD = 'F4xa3p0VT8FYpsKduvaM'; // "Last Payment Amount"
+async function sbGet(pathq) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return [];
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${pathq}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+  return r.ok ? r.json() : [];
+}
 const WHOP_BASE = 'https://api.whop.com/api/v1';
 const DASH_PASSWORD = process.env.DASH_PASSWORD || 'ffc2026';
 
@@ -278,6 +287,52 @@ app.post('/api/refresh', requireAuth, (req, res) => {
   for (const k of Object.keys(ghlCache)) delete ghlCache[k];
   for (const k of Object.keys(whopCache)) delete whopCache[k];
   res.json({ ok: true });
+});
+
+// ── High-ticket transactions (closed-won) + per-row funnel attribution ──
+app.get('/api/hightickets', requireAuth, async (req, res) => {
+  try {
+    const contacts = await ghlContacts(HT_LOCATION);
+    const hasClose = c => (c.tags || []).map(t => String(t).toLowerCase()).includes('closed-won');
+    // overrides (manual) + autos (email seen in our cf_events purchase ledger)
+    const [ovr, auto] = await Promise.all([
+      sbGet('ht_attribution?select=email,funnel'),
+      sbGet('cf_events?select=email,funnel&kind=eq.purchase'),
+    ]);
+    const overrideMap = Object.fromEntries(ovr.map(o => [(o.email || '').toLowerCase(), o.funnel]));
+    const autoMap = {}; for (const e of auto) { const k = (e.email || '').toLowerCase(); if (k && !autoMap[k]) autoMap[k] = e.funnel; }
+    const seen = new Set(); const rows = [];
+    for (const c of contacts) {
+      if (!hasClose(c)) continue;
+      const email = (c.email || '').toLowerCase(); const k = email || c.id;
+      if (!k || seen.has(k)) continue; seen.add(k);
+      const f = (c.customFields || []).find(x => x && (x.id === HT_CASH_FIELD || /last.?payment/i.test(x.name || '')));
+      const amount = Number(f?.value) || 0;
+      const manual = overrideMap[email];
+      const funnel = manual || (autoMap[email] ? autoMap[email] : 'unknown');
+      rows.push({
+        email, name: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.contactName || email || '(no name)',
+        amount, date: c.dateUpdated || c.dateAdded || null,
+        funnel, source: manual ? 'manual' : (autoMap[email] ? 'auto' : 'unknown'),
+      });
+    }
+    rows.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const total = rows.reduce((a, r) => a + r.amount, 0);
+    res.json({ rows, total, count: rows.length });
+  } catch (e) { res.status(500).json({ error: String(e.message || e) }); }
+});
+
+app.post('/api/attribution', requireAuth, async (req, res) => {
+  const email = String(req.body?.email || '').toLowerCase().trim();
+  const funnel = String(req.body?.funnel || '').trim();
+  if (!email || !funnel) return res.status(400).json({ error: 'email + funnel required' });
+  if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'no store' });
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/ht_attribution`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify([{ email, funnel, updated_at: new Date().toISOString() }]),
+  });
+  res.status(r.ok ? 200 : 500).json({ ok: r.ok });
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true, funnels: FUNNELS.length }));

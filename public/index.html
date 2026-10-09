@@ -163,6 +163,33 @@
   #login button { width: 100%; margin-top: 12px; padding: 14px; border: none; border-radius: 12px;
     background: var(--blue); color: #fff; font-size: 16px; font-weight: 700; }
   #login .msg { color: var(--critical); font-size: 13px; margin-top: 10px; min-height: 18px; }
+  /* bottom nav */
+  main { padding-bottom: 78px; }
+  #nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; gap: 8px;
+    padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); background: var(--bar);
+    backdrop-filter: blur(12px); border-top: 1px solid var(--hair); }
+  #nav button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: var(--surface); border: 1px solid var(--hair); border-radius: 12px; padding: 8px;
+    color: var(--muted); font-size: 11px; font-weight: 600; }
+  #nav button.on { color: var(--text); border-color: var(--blue); }
+  #nav button .ico { font-size: 18px; filter: grayscale(1) opacity(.7); }
+  #nav button.on .ico { filter: none; }
+  body.view-ht #ranges, body.view-ht #funnelSel { display: none; }
+  /* high-ticket list */
+  .ht-sum { display: flex; gap: 10px; margin-bottom: 14px; }
+  .ht-sum .card { flex: 1; padding: 14px 16px; }
+  .ht-sum .k { color: var(--muted); font-size: 12px; }
+  .ht-sum .v { font-size: 24px; font-weight: 800; margin-top: 2px; }
+  .ht-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--hair);
+    border-radius: 12px; background: var(--surface); margin-bottom: 8px; }
+  .ht-row .who { flex: 1; min-width: 0; }
+  .ht-row .nm { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ht-row .mt { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .ht-row .amt { font-weight: 800; font-size: 15px; white-space: nowrap; }
+  .ht-row select { appearance: none; background: var(--surface-2); color: var(--text); border: 1px solid var(--hair);
+    border-radius: 9px; padding: 7px 8px; font-size: 12px; font-weight: 600; max-width: 118px; }
+  .ht-row.unknown select { border-color: var(--warning); color: var(--warning); }
+  .ht-row .tagdot { font-size: 9px; color: var(--muted); text-align: right; margin-top: 3px; }
 </style>
 </head>
 <body>
@@ -194,9 +221,14 @@
   <div id="content"></div>
 </main>
 
+<nav id="nav">
+  <button data-v="dashboard" class="on"><span class="ico">📊</span><span class="lbl">Dashboard</span></button>
+  <button data-v="highticket"><span class="ico">💰</span><span class="lbl">High-Ticket</span></button>
+</nav>
+
 <script>
 const $ = (s, r=document) => r.querySelector(s);
-let RANGE = 'all', FUNNEL = null, DATA = null;
+let RANGE = 'all', FUNNEL = null, DATA = null, VIEW = 'dashboard', FUNNELS = [];
 
 // ── Theme (default light; persisted) ──
 function applyTheme(t) {
@@ -312,8 +344,60 @@ async function load() {
   } catch(e) { if (e.message!=='auth') $('#content').innerHTML = `<div class="err">${e.message}</div>`; }
 }
 
+// ── High-ticket sales view ──
+function htOptions(sel) {
+  const opts = [['unknown','Unknown'], ...FUNNELS.map(f => [f.id, f.name])];
+  return opts.map(([v,n]) => `<option value="${v}"${v===sel?' selected':''}>${n}</option>`).join('');
+}
+function renderHT(d) {
+  if (!d.rows.length) return `<div class="section-label">High-Ticket Sales</div><div class="empty">No high-ticket closes yet.</div>`;
+  const rows = d.rows.map(r => `
+    <div class="ht-row ${r.funnel==='unknown'?'unknown':''}" data-email="${(r.email||'').replace(/"/g,'')}">
+      <div class="who"><div class="nm">${r.name}</div><div class="mt">${r.date?new Date(r.date).toLocaleDateString():'—'} · ${r.email||''}</div></div>
+      <div style="text-align:right"><div class="amt">${money(r.amount)}</div><div class="tagdot">${r.source}</div></div>
+      <select onchange="setAttr(this)">${htOptions(r.funnel)}</select>
+    </div>`).join('');
+  return `<div class="section-label">High-Ticket Sales · ${d.count}</div>
+    <div class="ht-sum">
+      <div class="card"><div class="k">Total cash</div><div class="v">${money(d.total)}</div></div>
+      <div class="card"><div class="k">Transactions</div><div class="v">${int(d.count)}</div></div>
+    </div>${rows}`;
+}
+async function setAttr(el) {
+  const row = el.closest('.ht-row'); const email = row.dataset.email; const funnel = el.value;
+  row.classList.toggle('unknown', funnel==='unknown');
+  row.querySelector('.tagdot').textContent = 'saving…';
+  try { await api('/api/attribution', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, funnel }) });
+    row.querySelector('.tagdot').textContent = funnel==='unknown' ? 'unknown' : 'manual';
+  } catch(e){ row.querySelector('.tagdot').textContent = 'err'; }
+}
+
+async function load() {
+  if (VIEW === 'highticket') {
+    $('#content').innerHTML = skeleton();
+    try { $('#content').innerHTML = renderHT(await api('/api/hightickets')); }
+    catch(e){ if (e.message!=='auth') $('#content').innerHTML = `<div class="err">${e.message}</div>`; }
+    return;
+  }
+  if (!FUNNEL) return;
+  $('#content').innerHTML = skeleton();
+  try {
+    DATA = await api(`/api/funnel/${FUNNEL}?range=${RANGE}`);
+    $('#content').innerHTML = renderPage(DATA);
+  } catch(e) { if (e.message!=='auth') $('#content').innerHTML = `<div class="err">${e.message}</div>`; }
+}
+
+$('#nav').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  VIEW = b.dataset.v;
+  [...$('#nav').children].forEach(x => x.classList.toggle('on', x===b));
+  document.body.classList.toggle('view-ht', VIEW==='highticket');
+  load();
+});
+
 async function boot() {
   const { funnels } = await api('/api/funnels');
+  FUNNELS = funnels;
   $('#funnelSel').innerHTML = funnels.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
   FUNNEL = funnels[0]?.id;
   load();
