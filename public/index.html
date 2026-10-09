@@ -256,8 +256,10 @@ function renderPage(d) {
   const epc    = w ? w.epc : null;                                             // earnings per click (incl bumps + OTOs)
   const cpcall = w ? w.costPerBookedCall : null;                               // cost per booked call
   const revPerCall = (g && g.booked) ? g.cashCollected / g.booked : null;      // avg revenue (cash collected) per booked call
-  const revenue = w ? w.revenue : null;                                         // ad-attributed revenue (front-end + bumps + OTOs)
+  const revenue = w ? w.revenue : null;                                         // LT sales (front-end + bumps + OTOs)
   const spend   = w ? w.spend : null;                                           // ad spend
+  const totalRev  = ((w && w.revenue) || 0) + ((g && g.cashCollected) || 0);    // all sales = LT front-end + high-ticket cash
+  const totalRoas = (spend) ? totalRev / spend : null;                          // total revenue ÷ ad spend
   const adBubbles = [
     tile('CAC', money2(cac), 'cost to acquire'),
     tile('AOV', money2(aov), 'avg order value'),
@@ -267,6 +269,8 @@ function renderPage(d) {
     tile('Spend', money(spend), 'ad spend'),
     tile('Cost / Call', money2(cpcall), 'per booked call'),
     tile('Avg. Rev / Call', money(revPerCall), 'cash ÷ booked call'),
+    tile('Total Revenue', money(totalRev), 'all sales'),
+    tile('ROAS', totalRoas == null ? '—' : totalRoas.toFixed(2) + 'x', 'total'),
   ].join('');
 
   // funnel stage bubbles (whole number + conversion % from the stage above)
