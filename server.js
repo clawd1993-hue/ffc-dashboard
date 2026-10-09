@@ -213,6 +213,22 @@ async function whopAds(biz) {
   return ads;
 }
 
+// Meta spend adapter — all-time spend for a dedicated ad account (account = funnel). Needs META_TOKEN with ads_read on the account.
+const META_TOKEN = process.env.META_TOKEN || '';
+const metaCache = {};
+async function metaSpend(accountId) {
+  if (!META_TOKEN || !accountId) return null;
+  const hit = metaCache[accountId]; if (hit && Date.now() - hit.ts < 5 * 60 * 1000) return hit.v;
+  const act = String(accountId).startsWith('act_') ? accountId : 'act_' + accountId;
+  const url = `https://graph.facebook.com/v21.0/${act}/insights?fields=spend&date_preset=maximum&access_token=${encodeURIComponent(META_TOKEN)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Meta ' + res.status + ': ' + (await res.text()).slice(0, 120));
+  const d = await res.json();
+  const v = d.data && d.data[0] ? Number(d.data[0].spend) || 0 : 0;
+  metaCache[accountId] = { ts: Date.now(), v };
+  return v;
+}
+
 // FFC product set (front-end + bumps + OTOs) → revenue = sum of their Whop custom_event_values
 const WHOP_PRODUCTS = ['purchase', 'bump_22_niches', 'bump_viral_reels', 'oto_dfy_funnel', 'oto_dfy_products', 'downsell'];
 function whopSummary(ads) {
@@ -259,12 +275,12 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
   if (slug) jobs.push(
     Promise.all([
       sbGet(`funnel_rollup?funnel=eq.${slug}&select=customers,sales`),
-      sbGet(`funnel_ad_source?funnel=eq.${slug}&select=provider,account_id`),
+      sbGet(`funnel_ad_source?funnel=eq.${slug}&select=provider,account_id,status,frozen_amount`),
       sbGet(`funnel_spend?funnel=eq.${slug}&select=amount`),
     ]).then(([roll, src, arch]) => {
       const b = roll[0]; if (b) { const cu = Number(b.customers) || 0, sa = Number(b.sales) || 0; out.ours = { customers: cu, sales: sa, aov: cu ? sa / cu : null }; }
       const archived = arch.reduce((a, x) => a + (Number(x.amount) || 0), 0);
-      spendMeta = { provider: src[0]?.provider || null, account_id: src[0]?.account_id || null, archived };
+      spendMeta = { sources: src || [], archived };   // multi-source: sum all live sources + frozen + archived
     }).catch(e => out.errors.push('ledger: ' + e.message))
   );
   let callsAttributed = null;
@@ -299,15 +315,20 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
   // ── Spend ledger: archived (retired accounts, frozen) + live (current active source) ──
   // Account-proof: swap accounts → old spend stays in funnel_spend, new source tallies forward.
   if (out.ours && spendMeta) {
-    let live = null;
-    try {
-      if (spendMeta.provider === 'whop' && spendMeta.account_id) {
-        const ads = await whopAds(spendMeta.account_id);
-        const s = whopSummary(ads); live = s ? s.spend : null;
-      } // meta/other providers wire here later
-    } catch (e) { out.errors.push('spend: ' + e.message); }
-    const total = (spendMeta.archived || 0) + (live || 0);
-    out.ours.spend = { total, archived: spendMeta.archived || 0, live, provider: spendMeta.provider, cac: out.ours.customers ? total / out.ours.customers : null };
+    let live = 0, frozen = 0; const used = [];
+    for (const s of spendMeta.sources) {
+      try {
+        if (s.status === 'frozen') { frozen += Number(s.frozen_amount) || 0; used.push({ provider: s.provider, status: 'frozen' }); continue; }
+        if (s.provider === 'whop' && s.account_id) {
+          const ads = await whopAds(s.account_id); const sum = whopSummary(ads);
+          live += sum ? sum.spend : 0; used.push({ provider: 'whop', status: 'live' });
+        } else if (s.provider === 'meta' && s.account_id) {
+          const m = await metaSpend(s.account_id); live += m || 0; used.push({ provider: 'meta', status: 'live', wired: m != null });
+        }
+      } catch (e) { out.errors.push('spend(' + s.provider + '): ' + e.message); }
+    }
+    const total = (spendMeta.archived || 0) + frozen + live;
+    out.ours.spend = { total, live, frozen, archived: spendMeta.archived || 0, sources: used, cac: out.ours.customers ? total / out.ours.customers : null };
     if (callsAttributed != null) {
       out.ours.calls = callsAttributed;
       out.ours.costPerCall = callsAttributed ? total / callsAttributed : null;
