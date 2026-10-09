@@ -283,7 +283,7 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
       spendMeta = { sources: src || [], archived };   // multi-source: sum all live sources + frozen + archived
     }).catch(e => out.errors.push('ledger: ' + e.message))
   );
-  let callsAttributed = null;
+  let callsAttributed = null, htRev = null;
   if (cfg.ghl) jobs.push(
     Promise.all([
       ghlContacts(cfg.ghl.locationId),
@@ -291,22 +291,41 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
       slug ? sbGet('cf_events?select=email,funnel') : Promise.resolve([]),
       slug ? sbGet('dash_config?key=eq.fresh_start&select=value') : Promise.resolve([]),
       slug ? sbGet(`manual_calls?funnel=eq.${slug}&select=email`) : Promise.resolve([]),
-    ]).then(([c, ovr, auto, cfg2, man]) => {
+      slug ? sbGet('ht_attribution?select=email,funnel') : Promise.resolve([]),
+      slug ? sbGet(`manual_closes?funnel=eq.${slug}&select=amount`) : Promise.resolve([]),
+    ]).then(([c, ovr, auto, cfg2, man, htOvr, manClose]) => {
       out.ghl = ghlMetrics(c, cfg.ghl, range);
       if (slug) {
         const freshStart = cfg2[0]?.value ? new Date(cfg2[0].value) : null;
         const omap = Object.fromEntries(ovr.map(o => [(o.email || '').toLowerCase(), o.funnel]));
         const amap = {}; for (const e of auto) { const k = (e.email || '').toLowerCase(); if (k && !amap[k]) amap[k] = e.funnel; }
-        const seen = new Set(); let n = man.length;   // manual-added calls for this funnel count directly
+        const htmap = Object.fromEntries(htOvr.map(o => [(o.email || '').toLowerCase(), o.funnel]));
+        // calls attributed to this funnel
+        const seen = new Set(); let n = man.length;   // manual-added calls count directly
         for (const m of man) seen.add((m.email || '').toLowerCase());
+        // high-ticket revenue attributed to this funnel (manual closes + post-cutoff GHL closes matched)
+        let rev = manClose.reduce((a, m) => a + (Number(m.amount) || 0), 0);
+        const seenC = new Set();
         for (const x of c) {
-          if (!(x.tags || []).map(t => String(t).toLowerCase()).includes('call-booked')) continue;
+          const tags = (x.tags || []).map(t => String(t).toLowerCase());
           const dt = x.dateUpdated || x.dateAdded || null;
-          if (freshStart && (!dt || new Date(dt) < freshStart)) continue;   // only post-fresh-start GHL calls
-          const email = (x.email || '').toLowerCase(); const k = email || x.id; if (!k || seen.has(k)) continue; seen.add(k);
-          if ((omap[email] || amap[email]) === slug) n++;
+          const email = (x.email || '').toLowerCase();
+          if (tags.includes('call-booked')) {
+            const k = email || x.id;
+            if (k && !seen.has(k) && !(freshStart && (!dt || new Date(dt) < freshStart))) { seen.add(k); if ((omap[email] || amap[email]) === slug) n++; }
+          }
+          if (tags.includes('closed-won')) {
+            const k = email || x.id;
+            if (k && !seenC.has(k) && !(freshStart && (!dt || new Date(dt) < freshStart))) {
+              seenC.add(k);
+              if ((htmap[email] || amap[email]) === slug) {
+                const f = (x.customFields || []).find(y => y && (y.id === HT_CASH_FIELD || /last.?payment/i.test(y.name || '')));
+                rev += Number(f?.value) || 0;
+              }
+            }
+          }
         }
-        callsAttributed = n;
+        callsAttributed = n; htRev = rev;
       }
     })
       .catch(e => out.errors.push('GHL: ' + e.message))
@@ -338,6 +357,12 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
     if (callsAttributed != null) {
       out.ours.calls = callsAttributed;
       out.ours.costPerCall = callsAttributed ? total / callsAttributed : null;
+    }
+    if (htRev != null) {
+      out.ours.highTicketRev = htRev;                                     // attributed high-ticket cash (manual + post-cutoff GHL)
+      out.ours.totalRev = (out.ours.sales || 0) + htRev;                  // LT (clean) + HT (attributed) — no stale GHL lump
+      out.ours.roas = total ? out.ours.totalRev / total : null;
+      out.ours.avgRevPerCall = out.ours.calls ? htRev / out.ours.calls : null;
     }
   }
 

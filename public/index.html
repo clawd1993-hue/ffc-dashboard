@@ -293,7 +293,8 @@ function renderPage(d) {
   const epc    = w ? w.epc : null;                                             // earnings per click (incl bumps + OTOs)
   const cpcall = (ours && ours.costPerCall != null) ? ours.costPerCall : null;  // spend ÷ attributed calls (OUR data only, no Whop fallback)
   const cpcLive = !!(ours && ours.calls > 0 && ours.costPerCall != null);       // green ONLY when real attributed calls exist
-  const revPerCall = (g && g.booked) ? g.cashCollected / g.booked : null;      // avg revenue (cash collected) per booked call
+  const revPerCall = (ours && ours.avgRevPerCall != null) ? ours.avgRevPerCall : null; // attributed HT cash ÷ attributed calls (our data)
+  const rpcLive = !!(ours && ours.calls > 0 && ours.avgRevPerCall != null);
   const revenue = (ours && ours.sales != null) ? ours.sales : (w ? w.revenue : null); // LT sales = our ledger (baseline + live CF)
   const revLive = !!(ours && ours.sales != null);
   const spd     = (ours && ours.spend) ? ours.spend : null;                     // spend ledger: archived + active source
@@ -301,36 +302,44 @@ function renderPage(d) {
   const spendLive = !!spd;
   const cac    = (spd && spd.cac != null) ? spd.cac : ((ours && ours.customers && spend != null) ? spend / ours.customers : (w ? w.cac : null));
   const cacLive = !!(spd && spd.cac != null);
-  const totalRev  = ((revenue) || 0) + ((g && g.cashCollected) || 0);           // all sales = LT (our ledger) + high-ticket cash
-  const totalRoas = (spend) ? totalRev / spend : null;                          // total revenue ÷ ad spend
-  const roasLive = !!(spendLive && revLive);
+  const totalRev  = (ours && ours.totalRev != null) ? ours.totalRev : null;     // LT (clean) + HT (attributed only) — NO stale GHL lump
+  const totalRoas = (ours && ours.roas != null) ? ours.roas : null;
+  const roasLive = !!(ours && ours.roas != null && spendLive);
+  const totalRevLive = !!(ours && ours.totalRev != null);
   const adBubbles = [
     tile('CAC' + (cacLive ? ' <span class="dot ok"></span>' : ''), money2(cac), cacLive ? 'spend ÷ customers' : 'cost to acquire'),
     tile('AOV' + (aovLive ? ' <span class="dot ok"></span>' : ''), money2(aov), aovLive ? 'our data · live' : 'avg order value'),
     tile('Front-End Rev' + (revLive ? ' <span class="dot ok"></span>' : ''), money(revenue), revLive ? 'LT Sales · live' : 'LT Sales'),
     tile('Spend' + (spendLive ? ' <span class="dot ok"></span>' : ''), money(spend), spendLive ? 'ledger · ' + (spd.provider||'') : 'ad spend'),
     tile('Cost / Call' + (cpcLive ? ' <span class="dot ok"></span>' : ''), money2(cpcall), (ours && ours.calls != null) ? `${int(ours.calls)} attributed calls` : 'per booked call'),
-    tile('Avg. Rev / Call', money(revPerCall), 'cash ÷ booked call'),
-    tile('Total Revenue <span class="dot warn"></span>', money(totalRev), 'LT ours · HT=GHL old'),
-    tile('ROAS <span class="dot warn"></span>', totalRoas == null ? '—' : totalRoas.toFixed(2) + 'x', 'incl HT=GHL old'),
+    tile('Avg. Rev / Call' + (rpcLive ? ' <span class="dot ok"></span>' : ''), money(revPerCall), rpcLive ? 'HT cash ÷ calls' : 'per booked call'),
+    tile('Total Revenue' + (totalRevLive ? ' <span class="dot ok"></span>' : ''), money(totalRev), totalRevLive ? 'LT + attributed HT' : 'all sales'),
+    tile('ROAS' + (roasLive ? ' <span class="dot ok"></span>' : ''), totalRoas == null ? '—' : totalRoas.toFixed(2) + 'x', 'total'),
   ].join('');
 
   // funnel stage bubbles (whole number + conversion % from the stage above)
   let funnelHtml;
   if (g) {
-    const suLive = !!(ours && ours.customers != null);
-    const fv = Object.assign({}, g, suLive ? { signups: ours.customers } : {}); // Signups = front-end buyers from our ledger
+    // Only OUR clean data: Signups = ledger customers, Booked = attributed calls. Rest = — (not wired yet, no stale GHL).
+    const fv = {
+      signups: (ours && ours.customers != null) ? ours.customers : null,
+      leads: null,
+      booked: (ours && ours.calls != null) ? ours.calls : null,
+      shows: null,
+      closes: null,
+    };
     const stages = [['signups','Signups','--o1'],['leads','Leads','--o2'],['booked','Booked','--o3'],['shows','Shows','--o4'],['closes','Closes','--o5']];
-    const max = Math.max(fv.signups, 1);
+    const max = Math.max(fv.signups || 1, 1);
     const bars = stages.map(([k,name,c], i) => {
       const v = fv[k];
       const prev = i > 0 ? fv[stages[i-1][0]] : null;
-      const conv = (prev != null && prev > 0) ? v / prev : null;
-      const w = Math.max((v / max) * 100, v > 0 ? 3 : 0);
-      const dot = (k==='signups' && suLive) ? ' <span class="dot ok"></span>' : '';
-      return `<div class="fbar"><div class="top"><span class="name">${name}${dot}</span><span class="cnt num">${int(v)}</span></div>
-        <div class="track"><div class="fill" style="width:${w}%;background:var(${c})"></div></div>
-        ${i>0?`<div class="conv">${pct(conv)} from ${stages[i-1][1]}</div>`:''}</div>`;
+      const conv = (v != null && prev != null && prev > 0) ? v / prev : null;
+      const wd = (v != null) ? Math.max((v / max) * 100, v > 0 ? 3 : 0) : 0;
+      const live = (k==='signups' || k==='booked') && v != null;
+      const dot = live ? ' <span class="dot ok"></span>' : '';
+      return `<div class="fbar"><div class="top"><span class="name">${name}${dot}</span><span class="cnt num">${v==null?'—':int(v)}</span></div>
+        <div class="track"><div class="fill" style="width:${wd}%;background:var(${c})"></div></div>
+        ${i>0&&conv!=null?`<div class="conv">${pct(conv)} from ${stages[i-1][1]}</div>`:''}</div>`;
     }).join('');
     funnelHtml = `<div class="section-label" style="margin-top:22px">Funnel · ${d.range.toUpperCase()}</div>
       <div class="card">${bars}</div>`;
