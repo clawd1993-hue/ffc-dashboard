@@ -267,9 +267,26 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
       spendMeta = { provider: src[0]?.provider || null, account_id: src[0]?.account_id || null, archived };
     }).catch(e => out.errors.push('ledger: ' + e.message))
   );
+  let callsAttributed = null;
   if (cfg.ghl) jobs.push(
-    ghlContacts(cfg.ghl.locationId)
-      .then(c => { out.ghl = ghlMetrics(c, cfg.ghl, range); })
+    Promise.all([
+      ghlContacts(cfg.ghl.locationId),
+      slug ? sbGet('call_attribution?select=email,funnel') : Promise.resolve([]),
+      slug ? sbGet('cf_events?select=email,funnel') : Promise.resolve([]),
+    ]).then(([c, ovr, auto]) => {
+      out.ghl = ghlMetrics(c, cfg.ghl, range);
+      if (slug) {
+        const omap = Object.fromEntries(ovr.map(o => [(o.email || '').toLowerCase(), o.funnel]));
+        const amap = {}; for (const e of auto) { const k = (e.email || '').toLowerCase(); if (k && !amap[k]) amap[k] = e.funnel; }
+        const seen = new Set(); let n = 0;
+        for (const x of c) {
+          if (!(x.tags || []).map(t => String(t).toLowerCase()).includes('call-booked')) continue;
+          const email = (x.email || '').toLowerCase(); const k = email || x.id; if (!k || seen.has(k)) continue; seen.add(k);
+          if ((omap[email] || amap[email]) === slug) n++;
+        }
+        callsAttributed = n;
+      }
+    })
       .catch(e => out.errors.push('GHL: ' + e.message))
   );
   if (cfg.whopBiz) jobs.push(
@@ -291,6 +308,10 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
     } catch (e) { out.errors.push('spend: ' + e.message); }
     const total = (spendMeta.archived || 0) + (live || 0);
     out.ours.spend = { total, archived: spendMeta.archived || 0, live, provider: spendMeta.provider, cac: out.ours.customers ? total / out.ours.customers : null };
+    if (callsAttributed != null) {
+      out.ours.calls = callsAttributed;
+      out.ours.costPerCall = callsAttributed ? total / callsAttributed : null;
+    }
   }
 
   // Combined truth metrics when both sources exist: Whop sees only the $6.95
@@ -355,6 +376,48 @@ app.post('/api/attribution', requireAuth, async (req, res) => {
   if (!email || !funnel) return res.status(400).json({ error: 'email + funnel required' });
   if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'no store' });
   const r = await fetch(`${SUPABASE_URL}/rest/v1/ht_attribution`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify([{ email, funnel, updated_at: new Date().toISOString() }]),
+  });
+  res.status(r.ok ? 200 : 500).json({ ok: r.ok });
+});
+
+// ── Booked calls (Calendly→GHL) + per-row funnel attribution (email-match to our ledger) ──
+app.get('/api/calls', requireAuth, async (req, res) => {
+  try {
+    const contacts = await ghlContacts(HT_LOCATION);
+    const hasCall = c => (c.tags || []).map(t => String(t).toLowerCase()).includes('call-booked');
+    const [ovr, auto] = await Promise.all([
+      sbGet('call_attribution?select=email,funnel'),
+      sbGet('cf_events?select=email,funnel'),   // any cf_events contact (lead or purchase) tells us their funnel
+    ]);
+    const overrideMap = Object.fromEntries(ovr.map(o => [(o.email || '').toLowerCase(), o.funnel]));
+    const autoMap = {}; for (const e of auto) { const k = (e.email || '').toLowerCase(); if (k && !autoMap[k]) autoMap[k] = e.funnel; }
+    const seen = new Set(); const rows = [];
+    for (const c of contacts) {
+      if (!hasCall(c)) continue;
+      const email = (c.email || '').toLowerCase(); const k = email || c.id;
+      if (!k || seen.has(k)) continue; seen.add(k);
+      const manual = overrideMap[email];
+      const funnel = manual || (autoMap[email] ? autoMap[email] : 'unknown');
+      rows.push({
+        email, name: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.contactName || email || '(no name)',
+        date: c.dateUpdated || c.dateAdded || null,
+        funnel, source: manual ? 'manual' : (autoMap[email] ? 'auto' : 'unknown'),
+      });
+    }
+    rows.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    res.json({ rows, count: rows.length });
+  } catch (e) { res.status(500).json({ error: String(e.message || e) }); }
+});
+
+app.post('/api/call-attribution', requireAuth, async (req, res) => {
+  const email = String(req.body?.email || '').toLowerCase().trim();
+  const funnel = String(req.body?.funnel || '').trim();
+  if (!email || !funnel) return res.status(400).json({ error: 'email + funnel required' });
+  if (!SUPABASE_URL || !SUPABASE_KEY) return res.status(500).json({ error: 'no store' });
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/call_attribution`, {
     method: 'POST',
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify([{ email, funnel, updated_at: new Date().toISOString() }]),

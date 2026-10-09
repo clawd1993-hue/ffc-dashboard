@@ -177,7 +177,7 @@
   #nav button.on { color: var(--text); border-color: var(--blue); }
   #nav button .ico { font-size: 18px; filter: grayscale(1) opacity(.7); }
   #nav button.on .ico { filter: none; }
-  body.view-ht #ranges, body.view-ht #funnelSel { display: none; }
+  body.view-ht #ranges, body.view-ht #funnelSel, body.view-calls #ranges, body.view-calls #funnelSel { display: none; }
   /* high-ticket list */
   .ht-sum { display: flex; gap: 10px; margin-bottom: 14px; }
   .ht-sum .card { flex: 1; padding: 14px 16px; }
@@ -227,6 +227,7 @@
 <nav id="nav">
   <button data-v="dashboard" class="on"><span class="ico">📊</span><span class="lbl">Dashboard</span></button>
   <button data-v="highticket"><span class="ico">💰</span><span class="lbl">High-Ticket</span></button>
+  <button data-v="calls"><span class="ico">📞</span><span class="lbl">Calls</span></button>
 </nav>
 
 <script>
@@ -290,7 +291,8 @@ function renderPage(d) {
   const aovLive = !!(ours && ours.aov != null);
   const cpc    = w ? w.cpc : null;                                             // cost per click
   const epc    = w ? w.epc : null;                                             // earnings per click (incl bumps + OTOs)
-  const cpcall = w ? w.costPerBookedCall : null;                               // cost per booked call
+  const cpcall = (ours && ours.costPerCall != null) ? ours.costPerCall : (w ? w.costPerBookedCall : null); // spend ÷ attributed calls
+  const cpcLive = !!(ours && ours.calls != null);                              // our call attribution is live (even if 0 matched)
   const revPerCall = (g && g.booked) ? g.cashCollected / g.booked : null;      // avg revenue (cash collected) per booked call
   const revenue = (ours && ours.sales != null) ? ours.sales : (w ? w.revenue : null); // LT sales = our ledger (baseline + live CF)
   const revLive = !!(ours && ours.sales != null);
@@ -307,7 +309,7 @@ function renderPage(d) {
     tile('AOV' + (aovLive ? ' <span class="dot ok"></span>' : ''), money2(aov), aovLive ? 'our data · live' : 'avg order value'),
     tile('Front-End Rev' + (revLive ? ' <span class="dot ok"></span>' : ''), money(revenue), revLive ? 'LT Sales · live' : 'LT Sales'),
     tile('Spend' + (spendLive ? ' <span class="dot ok"></span>' : ''), money(spend), spendLive ? 'ledger · ' + (spd.provider||'') : 'ad spend'),
-    tile('Cost / Call', money2(cpcall), 'per booked call'),
+    tile('Cost / Call' + (cpcLive ? ' <span class="dot ok"></span>' : ''), money2(cpcall), cpcLive ? `spend ÷ ${int(ours.calls)} calls` : 'per booked call'),
     tile('Avg. Rev / Call', money(revPerCall), 'cash ÷ booked call'),
     tile('Total Revenue <span class="dot warn"></span>', money(totalRev), 'LT ours · HT=GHL old'),
     tile('ROAS <span class="dot warn"></span>', totalRoas == null ? '—' : totalRoas.toFixed(2) + 'x', 'incl HT=GHL old'),
@@ -385,11 +387,39 @@ async function setAttr(el) {
   } catch(e){ row.querySelector('.tagdot').textContent = 'err'; }
 }
 
+// ── Calls view (booked calls, email-matched to funnel) ──
+function renderCalls(d) {
+  if (!d.rows.length) return `<div class="section-label">Booked Calls</div><div class="empty">No booked calls yet.</div>`;
+  const unk = d.rows.filter(r => r.funnel==='unknown').length;
+  const rows = d.rows.map(r => `
+    <div class="ht-row ${r.funnel==='unknown'?'unknown':''}" data-email="${(r.email||'').replace(/"/g,'')}">
+      <div class="who"><div class="nm">${r.name}</div><div class="mt">${r.date?new Date(r.date).toLocaleDateString():'—'} · ${r.email||''}</div></div>
+      <div style="text-align:right"><div class="tagdot">${r.source}</div></div>
+      <select onchange="setCallAttr(this)">${htOptions(r.funnel)}</select>
+    </div>`).join('');
+  return `<div class="section-label">Booked Calls · ${d.count}</div>
+    <div class="ht-sum">
+      <div class="card"><div class="k">Total calls</div><div class="v">${int(d.count)}</div></div>
+      <div class="card"><div class="k">Unknown</div><div class="v">${int(unk)}</div></div>
+    </div>${rows}`;
+}
+async function setCallAttr(el) {
+  const row = el.closest('.ht-row'); const email = row.dataset.email; const funnel = el.value;
+  row.classList.toggle('unknown', funnel==='unknown');
+  row.querySelector('.tagdot').textContent = 'saving…';
+  try { await api('/api/call-attribution', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, funnel }) });
+    row.querySelector('.tagdot').textContent = funnel==='unknown' ? 'unknown' : 'manual';
+  } catch(e){ row.querySelector('.tagdot').textContent = 'err'; }
+}
+
 async function load() {
-  if (VIEW === 'highticket') {
+  if (VIEW === 'highticket' || VIEW === 'calls') {
     $('#content').innerHTML = skeleton();
-    try { $('#content').innerHTML = renderHT(await api('/api/hightickets')); }
-    catch(e){ if (e.message!=='auth') $('#content').innerHTML = `<div class="err">${e.message}</div>`; }
+    try {
+      $('#content').innerHTML = VIEW === 'calls'
+        ? renderCalls(await api('/api/calls'))
+        : renderHT(await api('/api/hightickets'));
+    } catch(e){ if (e.message!=='auth') $('#content').innerHTML = `<div class="err">${e.message}</div>`; }
     return;
   }
   if (!FUNNEL) return;
@@ -405,6 +435,7 @@ $('#nav').addEventListener('click', e => {
   VIEW = b.dataset.v;
   [...$('#nav').children].forEach(x => x.classList.toggle('on', x===b));
   document.body.classList.toggle('view-ht', VIEW==='highticket');
+  document.body.classList.toggle('view-calls', VIEW==='calls');
   load();
 });
 
