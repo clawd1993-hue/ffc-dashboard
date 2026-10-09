@@ -291,8 +291,8 @@ function renderPage(d) {
   const aovLive = !!(ours && ours.aov != null);
   const cpc    = w ? w.cpc : null;                                             // cost per click
   const epc    = w ? w.epc : null;                                             // earnings per click (incl bumps + OTOs)
-  const cpcall = (ours && ours.costPerCall != null) ? ours.costPerCall : (w ? w.costPerBookedCall : null); // spend ÷ attributed calls
-  const cpcLive = !!(ours && ours.calls != null);                              // our call attribution is live (even if 0 matched)
+  const cpcall = (ours && ours.costPerCall != null) ? ours.costPerCall : null;  // spend ÷ attributed calls (OUR data only, no Whop fallback)
+  const cpcLive = !!(ours && ours.calls > 0 && ours.costPerCall != null);       // green ONLY when real attributed calls exist
   const revPerCall = (g && g.booked) ? g.cashCollected / g.booked : null;      // avg revenue (cash collected) per booked call
   const revenue = (ours && ours.sales != null) ? ours.sales : (w ? w.revenue : null); // LT sales = our ledger (baseline + live CF)
   const revLive = !!(ours && ours.sales != null);
@@ -309,7 +309,7 @@ function renderPage(d) {
     tile('AOV' + (aovLive ? ' <span class="dot ok"></span>' : ''), money2(aov), aovLive ? 'our data · live' : 'avg order value'),
     tile('Front-End Rev' + (revLive ? ' <span class="dot ok"></span>' : ''), money(revenue), revLive ? 'LT Sales · live' : 'LT Sales'),
     tile('Spend' + (spendLive ? ' <span class="dot ok"></span>' : ''), money(spend), spendLive ? 'ledger · ' + (spd.provider||'') : 'ad spend'),
-    tile('Cost / Call' + (cpcLive ? ' <span class="dot ok"></span>' : ''), money2(cpcall), cpcLive ? `spend ÷ ${int(ours.calls)} calls` : 'per booked call'),
+    tile('Cost / Call' + (cpcLive ? ' <span class="dot ok"></span>' : ''), money2(cpcall), (ours && ours.calls != null) ? `${int(ours.calls)} attributed calls` : 'per booked call'),
     tile('Avg. Rev / Call', money(revPerCall), 'cash ÷ booked call'),
     tile('Total Revenue <span class="dot warn"></span>', money(totalRev), 'LT ours · HT=GHL old'),
     tile('ROAS <span class="dot warn"></span>', totalRoas == null ? '—' : totalRoas.toFixed(2) + 'x', 'incl HT=GHL old'),
