@@ -294,21 +294,23 @@ function renderPage(d) {
   const revPerCall = (g && g.booked) ? g.cashCollected / g.booked : null;      // avg revenue (cash collected) per booked call
   const revenue = (ours && ours.sales != null) ? ours.sales : (w ? w.revenue : null); // LT sales = our ledger (baseline + live CF)
   const revLive = !!(ours && ours.sales != null);
-  const spend   = w ? w.spend : null;                                           // ad spend (from ad platform)
-  const cac    = (ours && ours.customers && spend != null) ? spend / ours.customers   // CAC = ad spend ÷ unique customers (our ledger)
-                 : (w ? w.cac : null);
-  const cacLive = !!(ours && ours.customers && spend != null);
+  const spd     = (ours && ours.spend) ? ours.spend : null;                     // spend ledger: archived + active source
+  const spend   = spd ? spd.total : (w ? w.spend : null);                       // ad spend (ledger = account-proof)
+  const spendLive = !!spd;
+  const cac    = (spd && spd.cac != null) ? spd.cac : ((ours && ours.customers && spend != null) ? spend / ours.customers : (w ? w.cac : null));
+  const cacLive = !!(spd && spd.cac != null);
   const totalRev  = ((revenue) || 0) + ((g && g.cashCollected) || 0);           // all sales = LT (our ledger) + high-ticket cash
   const totalRoas = (spend) ? totalRev / spend : null;                          // total revenue ÷ ad spend
+  const roasLive = !!(spendLive && revLive);
   const adBubbles = [
-    tile('CAC' + (cacLive ? ' <span class="dot warn"></span>' : ''), money2(cac), cacLive ? 'spend (whop) ÷ customers' : 'cost to acquire'),
+    tile('CAC' + (cacLive ? ' <span class="dot ok"></span>' : ''), money2(cac), cacLive ? 'spend ÷ customers' : 'cost to acquire'),
     tile('AOV' + (aovLive ? ' <span class="dot ok"></span>' : ''), money2(aov), aovLive ? 'our data · live' : 'avg order value'),
     tile('Front-End Rev' + (revLive ? ' <span class="dot ok"></span>' : ''), money(revenue), revLive ? 'LT Sales · live' : 'LT Sales'),
-    tile('Spend', money(spend), 'ad spend'),
+    tile('Spend' + (spendLive ? ' <span class="dot ok"></span>' : ''), money(spend), spendLive ? 'ledger · ' + (spd.provider||'') : 'ad spend'),
     tile('Cost / Call', money2(cpcall), 'per booked call'),
     tile('Avg. Rev / Call', money(revPerCall), 'cash ÷ booked call'),
-    tile('Total Revenue', money(totalRev), 'all sales'),
-    tile('ROAS', totalRoas == null ? '—' : totalRoas.toFixed(2) + 'x', 'total'),
+    tile('Total Revenue' + (revLive ? ' <span class="dot ok"></span>' : ''), money(totalRev), 'all sales'),
+    tile('ROAS' + (roasLive ? ' <span class="dot ok"></span>' : ''), totalRoas == null ? '—' : totalRoas.toFixed(2) + 'x', 'total'),
   ].join('');
 
   // funnel stage bubbles (whole number + conversion % from the stage above)

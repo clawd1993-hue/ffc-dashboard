@@ -255,10 +255,17 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
 
   const jobs = [];
   const slug = { 'faceless-reels-lab': 'michael', 'ai-challenge': 'aicreator' }[cfg.id];
+  let spendMeta = null;
   if (slug) jobs.push(
-    sbGet(`funnel_rollup?funnel=eq.${slug}&select=customers,sales`)
-      .then(r => { const b = r[0]; if (b) { const cu = Number(b.customers) || 0, sa = Number(b.sales) || 0; out.ours = { customers: cu, sales: sa, aov: cu ? sa / cu : null }; } })
-      .catch(e => out.errors.push('ledger: ' + e.message))
+    Promise.all([
+      sbGet(`funnel_rollup?funnel=eq.${slug}&select=customers,sales`),
+      sbGet(`funnel_ad_source?funnel=eq.${slug}&select=provider,account_id`),
+      sbGet(`funnel_spend?funnel=eq.${slug}&select=amount`),
+    ]).then(([roll, src, arch]) => {
+      const b = roll[0]; if (b) { const cu = Number(b.customers) || 0, sa = Number(b.sales) || 0; out.ours = { customers: cu, sales: sa, aov: cu ? sa / cu : null }; }
+      const archived = arch.reduce((a, x) => a + (Number(x.amount) || 0), 0);
+      spendMeta = { provider: src[0]?.provider || null, account_id: src[0]?.account_id || null, archived };
+    }).catch(e => out.errors.push('ledger: ' + e.message))
   );
   if (cfg.ghl) jobs.push(
     ghlContacts(cfg.ghl.locationId)
@@ -271,6 +278,20 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
       .catch(e => out.errors.push('Whop: ' + e.message))
   );
   await Promise.all(jobs);
+
+  // ── Spend ledger: archived (retired accounts, frozen) + live (current active source) ──
+  // Account-proof: swap accounts → old spend stays in funnel_spend, new source tallies forward.
+  if (out.ours && spendMeta) {
+    let live = null;
+    try {
+      if (spendMeta.provider === 'whop' && spendMeta.account_id) {
+        const ads = await whopAds(spendMeta.account_id);
+        const s = whopSummary(ads); live = s ? s.spend : null;
+      } // meta/other providers wire here later
+    } catch (e) { out.errors.push('spend: ' + e.message); }
+    const total = (spendMeta.archived || 0) + (live || 0);
+    out.ours.spend = { total, archived: spendMeta.archived || 0, live, provider: spendMeta.provider, cac: out.ours.customers ? total / out.ours.customers : null };
+  }
 
   // Combined truth metrics when both sources exist: Whop sees only the $6.95
   // challenge value, blind to the Elite closes (those land in GHL/FanBasis).
