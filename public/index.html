@@ -263,10 +263,10 @@ function renderPage(d) {
     tile('AOV', money2(aov), 'avg order value'),
     tile('CPC', money2(cpc), 'cost per click'),
     tile('EPC', money2(epc), 'earnings per click'),
-    tile('Cost / Call', money2(cpcall), 'per booked call'),
-    tile('LTGP / Cust', money(ltgp), 'gross profit / cust'),
     tile('Revenue', money(revenue), 'ad-attributed'),
     tile('Spend', money(spend), 'ad spend'),
+    tile('Cost / Call', money2(cpcall), 'per booked call'),
+    tile('LTGP / Cust', money(ltgp), 'gross profit / cust'),
   ].join('');
 
   // funnel stage bubbles (whole number + conversion % from the stage above)
