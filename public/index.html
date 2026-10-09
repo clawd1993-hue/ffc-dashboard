@@ -114,6 +114,7 @@
   .tile .val.sm { font-size: 22px; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin-left: 2px; }
   .dot.ok { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+  .dot.warn { background: var(--warning); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 22%, transparent); }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 
   /* ── Funnel bars ── */
@@ -300,7 +301,7 @@ function renderPage(d) {
   const totalRev  = ((revenue) || 0) + ((g && g.cashCollected) || 0);           // all sales = LT (our ledger) + high-ticket cash
   const totalRoas = (spend) ? totalRev / spend : null;                          // total revenue ÷ ad spend
   const adBubbles = [
-    tile('CAC' + (cacLive ? ' <span class="dot ok"></span>' : ''), money2(cac), cacLive ? 'spend ÷ customers' : 'cost to acquire'),
+    tile('CAC' + (cacLive ? ' <span class="dot warn"></span>' : ''), money2(cac), cacLive ? 'spend (whop) ÷ customers' : 'cost to acquire'),
     tile('AOV' + (aovLive ? ' <span class="dot ok"></span>' : ''), money2(aov), aovLive ? 'our data · live' : 'avg order value'),
     tile('Front-End Rev' + (revLive ? ' <span class="dot ok"></span>' : ''), money(revenue), revLive ? 'LT Sales · live' : 'LT Sales'),
     tile('Spend', money(spend), 'ad spend'),
