@@ -293,15 +293,16 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
       slug ? sbGet(`manual_calls?funnel=eq.${slug}&select=email`) : Promise.resolve([]),
       slug ? sbGet('ht_attribution?select=email,funnel') : Promise.resolve([]),
       slug ? sbGet(`manual_closes?funnel=eq.${slug}&select=amount`) : Promise.resolve([]),
-    ]).then(([c, ovr, auto, cfg2, man, htOvr, manClose]) => {
+      slug ? sbGet(`funnel_baseline?funnel=eq.${slug}&select=booked_calls`) : Promise.resolve([]),
+    ]).then(([c, ovr, auto, cfg2, man, htOvr, manClose, base]) => {
       out.ghl = ghlMetrics(c, cfg.ghl, range);
       if (slug) {
         const freshStart = cfg2[0]?.value ? new Date(cfg2[0].value) : null;
         const omap = Object.fromEntries(ovr.map(o => [(o.email || '').toLowerCase(), o.funnel]));
         const amap = {}; for (const e of auto) { const k = (e.email || '').toLowerCase(); if (k && !amap[k]) amap[k] = e.funnel; }
         const htmap = Object.fromEntries(htOvr.map(o => [(o.email || '').toLowerCase(), o.funnel]));
-        // calls attributed to this funnel
-        const seen = new Set(); let n = man.length;   // manual-added calls count directly
+        // calls attributed to this funnel = baseline + manual-added + post-cutoff GHL matches
+        const seen = new Set(); let n = (Number(base[0]?.booked_calls) || 0) + man.length;
         for (const m of man) seen.add((m.email || '').toLowerCase());
         // high-ticket revenue attributed to this funnel (manual closes + post-cutoff GHL closes matched)
         let rev = manClose.reduce((a, m) => a + (Number(m.amount) || 0), 0);
