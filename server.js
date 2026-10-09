@@ -289,14 +289,20 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
       ghlContacts(cfg.ghl.locationId),
       slug ? sbGet('call_attribution?select=email,funnel') : Promise.resolve([]),
       slug ? sbGet('cf_events?select=email,funnel') : Promise.resolve([]),
-    ]).then(([c, ovr, auto]) => {
+      slug ? sbGet('dash_config?key=eq.fresh_start&select=value') : Promise.resolve([]),
+      slug ? sbGet(`manual_calls?funnel=eq.${slug}&select=email`) : Promise.resolve([]),
+    ]).then(([c, ovr, auto, cfg2, man]) => {
       out.ghl = ghlMetrics(c, cfg.ghl, range);
       if (slug) {
+        const freshStart = cfg2[0]?.value ? new Date(cfg2[0].value) : null;
         const omap = Object.fromEntries(ovr.map(o => [(o.email || '').toLowerCase(), o.funnel]));
         const amap = {}; for (const e of auto) { const k = (e.email || '').toLowerCase(); if (k && !amap[k]) amap[k] = e.funnel; }
-        const seen = new Set(); let n = 0;
+        const seen = new Set(); let n = man.length;   // manual-added calls for this funnel count directly
+        for (const m of man) seen.add((m.email || '').toLowerCase());
         for (const x of c) {
           if (!(x.tags || []).map(t => String(t).toLowerCase()).includes('call-booked')) continue;
+          const dt = x.dateUpdated || x.dateAdded || null;
+          if (freshStart && (!dt || new Date(dt) < freshStart)) continue;   // only post-fresh-start GHL calls
           const email = (x.email || '').toLowerCase(); const k = email || x.id; if (!k || seen.has(k)) continue; seen.add(k);
           if ((omap[email] || amap[email]) === slug) n++;
         }
@@ -364,15 +370,25 @@ app.get('/api/hightickets', requireAuth, async (req, res) => {
     const contacts = await ghlContacts(HT_LOCATION);
     const hasClose = c => (c.tags || []).map(t => String(t).toLowerCase()).includes('closed-won');
     // overrides (manual) + autos (email seen in our cf_events purchase ledger)
-    const [ovr, auto] = await Promise.all([
+    const [ovr, auto, cfg, man] = await Promise.all([
       sbGet('ht_attribution?select=email,funnel'),
       sbGet('cf_events?select=email,funnel&kind=eq.purchase'),
+      sbGet('dash_config?key=eq.fresh_start&select=value'),
+      sbGet('manual_closes?select=name,email,amount,funnel,date'),
     ]);
+    const freshStart = cfg[0]?.value ? new Date(cfg[0].value) : null;   // hide GHL closes before this (fresh start)
     const overrideMap = Object.fromEntries(ovr.map(o => [(o.email || '').toLowerCase(), o.funnel]));
     const autoMap = {}; for (const e of auto) { const k = (e.email || '').toLowerCase(); if (k && !autoMap[k]) autoMap[k] = e.funnel; }
     const seen = new Set(); const rows = [];
+    // manual-added closes first (always shown, funnel preset)
+    for (const m of man) {
+      const email = (m.email || '').toLowerCase(); seen.add(email || Math.random());
+      rows.push({ email, name: m.name || email || '(no name)', amount: Number(m.amount) || 0, date: m.date || null, funnel: m.funnel || 'unknown', source: 'manual-add' });
+    }
     for (const c of contacts) {
       if (!hasClose(c)) continue;
+      const dt = c.dateUpdated || c.dateAdded || null;
+      if (freshStart && (!dt || new Date(dt) < freshStart)) continue;   // clear pre-fresh-start history
       const email = (c.email || '').toLowerCase(); const k = email || c.id;
       if (!k || seen.has(k)) continue; seen.add(k);
       const f = (c.customFields || []).find(x => x && (x.id === HT_CASH_FIELD || /last.?payment/i.test(x.name || '')));
@@ -381,7 +397,7 @@ app.get('/api/hightickets', requireAuth, async (req, res) => {
       const funnel = manual || (autoMap[email] ? autoMap[email] : 'unknown');
       rows.push({
         email, name: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.contactName || email || '(no name)',
-        amount, date: c.dateUpdated || c.dateAdded || null,
+        amount, date: dt,
         funnel, source: manual ? 'manual' : (autoMap[email] ? 'auto' : 'unknown'),
       });
     }
@@ -409,22 +425,31 @@ app.get('/api/calls', requireAuth, async (req, res) => {
   try {
     const contacts = await ghlContacts(HT_LOCATION);
     const hasCall = c => (c.tags || []).map(t => String(t).toLowerCase()).includes('call-booked');
-    const [ovr, auto] = await Promise.all([
+    const [ovr, auto, cfg, man] = await Promise.all([
       sbGet('call_attribution?select=email,funnel'),
       sbGet('cf_events?select=email,funnel'),   // any cf_events contact (lead or purchase) tells us their funnel
+      sbGet('dash_config?key=eq.fresh_start&select=value'),
+      sbGet('manual_calls?select=name,email,funnel,date'),
     ]);
+    const freshStart = cfg[0]?.value ? new Date(cfg[0].value) : null;
     const overrideMap = Object.fromEntries(ovr.map(o => [(o.email || '').toLowerCase(), o.funnel]));
     const autoMap = {}; for (const e of auto) { const k = (e.email || '').toLowerCase(); if (k && !autoMap[k]) autoMap[k] = e.funnel; }
     const seen = new Set(); const rows = [];
+    for (const m of man) {
+      const email = (m.email || '').toLowerCase(); seen.add(email || Math.random());
+      rows.push({ email, name: m.name || email || '(no name)', date: m.date || null, funnel: m.funnel || 'unknown', source: 'manual-add' });
+    }
     for (const c of contacts) {
       if (!hasCall(c)) continue;
+      const dt = c.dateUpdated || c.dateAdded || null;
+      if (freshStart && (!dt || new Date(dt) < freshStart)) continue;   // clear pre-fresh-start history
       const email = (c.email || '').toLowerCase(); const k = email || c.id;
       if (!k || seen.has(k)) continue; seen.add(k);
       const manual = overrideMap[email];
       const funnel = manual || (autoMap[email] ? autoMap[email] : 'unknown');
       rows.push({
         email, name: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.contactName || email || '(no name)',
-        date: c.dateUpdated || c.dateAdded || null,
+        date: dt,
         funnel, source: manual ? 'manual' : (autoMap[email] ? 'auto' : 'unknown'),
       });
     }
