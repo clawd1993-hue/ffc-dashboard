@@ -288,13 +288,7 @@ function renderPage(d) {
         ${i>0?`<div class="conv">${pct(conv)} from ${stages[i-1][1]}</div>`:''}</div>`;
     }).join('');
     funnelHtml = `<div class="section-label" style="margin-top:22px">Funnel · ${d.range.toUpperCase()}</div>
-      <div class="card">${bars}</div>
-      <div class="card" style="margin-top:12px">
-        <div class="kv"><span class="k">Signup → Booked</span><span class="v num">${pct(g.conv.signupToBooked)}</span></div>
-        <div class="kv"><span class="k">Booked → Show</span><span class="v num">${pct(g.conv.bookedToShow)}</span></div>
-        <div class="kv"><span class="k">Show → Close</span><span class="v num">${pct(g.conv.showToClose)}</span></div>
-        <div class="kv"><span class="k">Cash Collected</span><span class="v num">${money(g.cashCollected)}</span></div>
-      </div>`;
+      <div class="card">${bars}</div>`;
   } else {
     funnelHtml = `<div class="section-label" style="margin-top:22px">Funnel</div>
       <div class="empty">No GHL funnel pipeline for this funnel yet.</div>`;
