@@ -309,8 +309,8 @@ function renderPage(d) {
     tile('Spend' + (spendLive ? ' <span class="dot ok"></span>' : ''), money(spend), spendLive ? 'ledger · ' + (spd.provider||'') : 'ad spend'),
     tile('Cost / Call', money2(cpcall), 'per booked call'),
     tile('Avg. Rev / Call', money(revPerCall), 'cash ÷ booked call'),
-    tile('Total Revenue' + (revLive ? ' <span class="dot ok"></span>' : ''), money(totalRev), 'all sales'),
-    tile('ROAS' + (roasLive ? ' <span class="dot ok"></span>' : ''), totalRoas == null ? '—' : totalRoas.toFixed(2) + 'x', 'total'),
+    tile('Total Revenue <span class="dot warn"></span>', money(totalRev), 'LT ours · HT=GHL old'),
+    tile('ROAS <span class="dot warn"></span>', totalRoas == null ? '—' : totalRoas.toFixed(2) + 'x', 'incl HT=GHL old'),
   ].join('');
 
   // funnel stage bubbles (whole number + conversion % from the stage above)
