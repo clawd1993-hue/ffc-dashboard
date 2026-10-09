@@ -112,6 +112,8 @@
   .tile .sub { color: var(--muted); font-size: 12px; margin-top: 4px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tile .val.sm { font-size: 22px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin-left: 2px; }
+  .dot.ok { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 
   /* ── Funnel bars ── */
@@ -283,7 +285,9 @@ function renderPage(d) {
   const g = d.ghl, w = d.whop;
   // 6 ad bubbles (3 rows of 2)
   const cac    = w ? w.cac : null;                                             // spend ÷ front-end buyers
-  const aov    = w ? w.aov : null;                                             // avg order value (incl bumps + OTOs)
+  const ours   = d.ours;                                                       // our CF-webhook ledger + baseline
+  const aov    = (ours && ours.aov != null) ? ours.aov : (w ? w.aov : null);   // prefer OUR data (baseline + live CF sales)
+  const aovLive = !!(ours && ours.aov != null);
   const cpc    = w ? w.cpc : null;                                             // cost per click
   const epc    = w ? w.epc : null;                                             // earnings per click (incl bumps + OTOs)
   const cpcall = w ? w.costPerBookedCall : null;                               // cost per booked call
@@ -294,7 +298,7 @@ function renderPage(d) {
   const totalRoas = (spend) ? totalRev / spend : null;                          // total revenue ÷ ad spend
   const adBubbles = [
     tile('CAC', money2(cac), 'cost to acquire'),
-    tile('AOV', money2(aov), 'avg order value'),
+    tile('AOV' + (aovLive ? ' <span class="dot ok"></span>' : ''), money2(aov), aovLive ? 'our data · live' : 'avg order value'),
     tile('Front-End Rev', money(revenue), 'LT Sales'),
     tile('Spend', money(spend), 'ad spend'),
     tile('Cost / Call', money2(cpcall), 'per booked call'),

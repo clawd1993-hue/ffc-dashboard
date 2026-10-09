@@ -251,9 +251,15 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
   if (!cfg) return res.status(404).json({ error: 'Unknown funnel' });
   const range = (req.query.range || '30d').toLowerCase();
   if (DUMMY) return res.json(dummyFunnel(req.params.id, range));
-  const out = { id: cfg.id, name: cfg.name, range, ghl: null, whop: null, errors: [] };
+  const out = { id: cfg.id, name: cfg.name, range, ghl: null, whop: null, ours: null, errors: [] };
 
   const jobs = [];
+  const slug = { 'faceless-reels-lab': 'michael', 'ai-challenge': 'aicreator' }[cfg.id];
+  if (slug) jobs.push(
+    sbGet(`funnel_rollup?funnel=eq.${slug}&select=customers,sales`)
+      .then(r => { const b = r[0]; if (b) { const cu = Number(b.customers) || 0, sa = Number(b.sales) || 0; out.ours = { customers: cu, sales: sa, aov: cu ? sa / cu : null }; } })
+      .catch(e => out.errors.push('ledger: ' + e.message))
+  );
   if (cfg.ghl) jobs.push(
     ghlContacts(cfg.ghl.locationId)
       .then(c => { out.ghl = ghlMetrics(c, cfg.ghl, range); })
