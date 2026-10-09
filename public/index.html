@@ -291,17 +291,18 @@ function renderPage(d) {
   const epc    = w ? w.epc : null;                                             // earnings per click (incl bumps + OTOs)
   const cpcall = w ? w.costPerBookedCall : null;                               // cost per booked call
   const revPerCall = (g && g.booked) ? g.cashCollected / g.booked : null;      // avg revenue (cash collected) per booked call
-  const revenue = w ? w.revenue : null;                                         // LT sales (front-end + bumps + OTOs)
+  const revenue = (ours && ours.sales != null) ? ours.sales : (w ? w.revenue : null); // LT sales = our ledger (baseline + live CF)
+  const revLive = !!(ours && ours.sales != null);
   const spend   = w ? w.spend : null;                                           // ad spend (from ad platform)
   const cac    = (ours && ours.customers && spend != null) ? spend / ours.customers   // CAC = ad spend ÷ unique customers (our ledger)
                  : (w ? w.cac : null);
   const cacLive = !!(ours && ours.customers && spend != null);
-  const totalRev  = ((w && w.revenue) || 0) + ((g && g.cashCollected) || 0);    // all sales = LT front-end + high-ticket cash
+  const totalRev  = ((revenue) || 0) + ((g && g.cashCollected) || 0);           // all sales = LT (our ledger) + high-ticket cash
   const totalRoas = (spend) ? totalRev / spend : null;                          // total revenue ÷ ad spend
   const adBubbles = [
     tile('CAC' + (cacLive ? ' <span class="dot ok"></span>' : ''), money2(cac), cacLive ? 'spend ÷ customers' : 'cost to acquire'),
     tile('AOV' + (aovLive ? ' <span class="dot ok"></span>' : ''), money2(aov), aovLive ? 'our data · live' : 'avg order value'),
-    tile('Front-End Rev', money(revenue), 'LT Sales'),
+    tile('Front-End Rev' + (revLive ? ' <span class="dot ok"></span>' : ''), money(revenue), revLive ? 'LT Sales · live' : 'LT Sales'),
     tile('Spend', money(spend), 'ad spend'),
     tile('Cost / Call', money2(cpcall), 'per booked call'),
     tile('Avg. Rev / Call', money(revPerCall), 'cash ÷ booked call'),
