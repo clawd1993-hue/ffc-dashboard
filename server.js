@@ -277,10 +277,12 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
       sbGet(`funnel_rollup?funnel=eq.${slug}&select=customers,sales`),
       sbGet(`funnel_ad_source?funnel=eq.${slug}&select=provider,account_id,status,frozen_amount`),
       sbGet(`funnel_spend?funnel=eq.${slug}&select=amount`),
-    ]).then(([roll, src, arch]) => {
+      sbGet('hyros_spend?select=account_id,spend'),
+    ]).then(([roll, src, arch, hy]) => {
       const b = roll[0]; if (b) { const cu = Number(b.customers) || 0, sa = Number(b.sales) || 0; out.ours = { customers: cu, sales: sa, aov: cu ? sa / cu : null }; }
       const archived = arch.reduce((a, x) => a + (Number(x.amount) || 0), 0);
-      spendMeta = { sources: src || [], archived };   // multi-source: sum all live sources + frozen + archived
+      const hyrosMap = Object.fromEntries((hy || []).map(h => [h.account_id, Number(h.spend) || 0]));
+      spendMeta = { sources: src || [], archived, hyrosMap };   // multi-source: sum all live sources + frozen + archived
     }).catch(e => out.errors.push('ledger: ' + e.message))
   );
   let callsAttributed = null, htRev = null;
@@ -350,6 +352,8 @@ app.get('/api/funnel/:id', requireAuth, async (req, res) => {
           live += sum ? sum.spend : 0; used.push({ provider: 'whop', status: 'live' });
         } else if (s.provider === 'meta' && s.account_id) {
           const m = await metaSpend(s.account_id); live += m || 0; used.push({ provider: 'meta', status: 'live', wired: m != null });
+        } else if (s.provider === 'hyros' && s.account_id) {
+          live += (spendMeta.hyrosMap && spendMeta.hyrosMap[s.account_id]) || 0; used.push({ provider: 'hyros', status: 'live' });
         }
       } catch (e) { out.errors.push('spend(' + s.provider + '): ' + e.message); }
     }
